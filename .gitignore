@@ -1,0 +1,7 @@
+.env
+# SYSTEM_DESIGN_v1.1.md
+
+node_modules
+Charlie-Hotel.code-workspace
+
+.mcp.json

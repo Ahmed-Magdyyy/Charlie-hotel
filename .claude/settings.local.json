@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "WebSearch"
+    ]
+  },
+  "enabledMcpjsonServers": [
+    "mongodb-mcp-server",
+    "postman-api-http-server",
+    "figma",
+    "TestSprite",
+    "StitchMCP",
+    "apidog"
+  ]
+}
