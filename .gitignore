@@ -5,3 +5,5 @@ node_modules
 Charlie-Hotel.code-workspace
 
 .mcp.json
+.claude
+SYSTEM_DESIGN_v1.1.md
