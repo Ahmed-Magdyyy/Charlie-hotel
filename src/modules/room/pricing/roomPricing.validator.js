@@ -16,20 +16,18 @@ export const getPricingValidator = [
 
 export const bulkSetPricingValidator = [
   param("roomTypeId").isMongoId().withMessage("Invalid room type ID"),
-  body("startDate")
+  body("entries")
+    .isArray({ min: 1 })
+    .withMessage("entries must be a non-empty array"),
+  body("entries.*.date")
     .notEmpty()
-    .withMessage("startDate is required")
+    .withMessage("Each entry must have a date")
     .isISO8601({ strict: true, strictSeparator: true })
-    .withMessage("startDate must be a valid date (YYYY-MM-DD)"),
-  body("endDate")
+    .withMessage("Each date must be a valid date (YYYY-MM-DD)"),
+  body("entries.*.price")
     .notEmpty()
-    .withMessage("endDate is required")
-    .isISO8601({ strict: true, strictSeparator: true })
-    .withMessage("endDate must be a valid date (YYYY-MM-DD)"),
-  body("price")
-    .notEmpty()
-    .withMessage("price is required")
+    .withMessage("Each entry must have a price")
     .isFloat({ min: 0 })
-    .withMessage("price must be a positive number"),
+    .withMessage("Each price must be a non-negative number"),
   validatorMiddleware,
 ];

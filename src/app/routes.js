@@ -7,7 +7,7 @@ import roomAvailabilityRoutes from "../modules/room/availability/roomAvailabilit
 export function mountRoutes(app) {
   app.use("/api/v1/auth", authRoutes);
   app.use("/api/v1/users", userRoutes);
-  app.use("/api/v1/rooms", roomTypeRoutes);
   app.use("/api/v1/rooms/pricing", roomPricingRoutes);
   app.use("/api/v1/rooms/availability", roomAvailabilityRoutes);
+  app.use("/api/v1/rooms", roomTypeRoutes);
 }

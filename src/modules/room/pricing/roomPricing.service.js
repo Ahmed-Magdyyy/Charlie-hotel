@@ -2,7 +2,7 @@ import { ApiError } from "../../../shared/utils/ApiError.js";
 import { findRoomTypeById } from "../types/roomType.repository.js";
 import {
   findPricingByRoomTypeAndDateRange,
-  upsertPricingForDateRange,
+  upsertPricingEntries,
 } from "./roomPricing.repository.js";
 
 /**
@@ -34,24 +34,40 @@ export async function getPricingCalendarService(roomTypeId, query) {
           .slice(0, 10) + "T00:00:00.000Z",
       );
 
-  const pricing = await findPricingByRoomTypeAndDateRange(
+  const overrides = await findPricingByRoomTypeAndDateRange(
     roomTypeId,
     start,
     end,
   );
 
+  // Build a map of override dates for quick lookup
+  const overrideMap = new Map(
+    overrides.map((p) => [p.date.toISOString().slice(0, 10), p.price]),
+  );
+
+  // Return every date in the range with the resolved price
+  const calendar = [];
+  const current = new Date(start);
+  while (current <= end) {
+    const dateStr = current.toISOString().slice(0, 10);
+    const override = overrideMap.get(dateStr);
+    calendar.push({
+      date: dateStr,
+      price: override !== undefined ? override : roomType.basePrice,
+      isOverride: override !== undefined,
+    });
+    current.setUTCDate(current.getUTCDate() + 1);
+  }
+
   return {
     roomTypeId,
     basePrice: roomType.basePrice,
-    pricing: pricing.map((p) => ({
-      date: p.date.toISOString().slice(0, 10),
-      price: p.price,
-    })),
+    calendar,
   };
 }
 
 /**
- * Bulk set daily prices for a room type across a date range.
+ * Bulk set daily prices for a room type from an array of date-price entries.
  */
 export async function bulkSetPricingService(roomTypeId, body) {
   const roomType = await findRoomTypeById(roomTypeId, {
@@ -63,28 +79,17 @@ export async function bulkSetPricingService(roomTypeId, body) {
     throw new ApiError("Room type not found or inactive", 404);
   }
 
-  const { startDate, endDate, price } = body;
+  const { entries } = body;
 
-  const start = new Date(startDate + "T00:00:00.000Z");
-  const end = new Date(endDate + "T00:00:00.000Z");
-
-  if (end < start) {
-    throw new ApiError("endDate must be on or after startDate", 400);
+  if (entries.length > 365) {
+    throw new ApiError("Cannot set more than 365 entries at once", 400);
   }
 
-  // Cap at 365 days
-  const diffDays = (end - start) / (1000 * 60 * 60 * 24);
-  if (diffDays > 365) {
-    throw new ApiError("Date range cannot exceed 365 days", 400);
-  }
-
-  const result = await upsertPricingForDateRange(roomTypeId, start, end, price);
+  const result = await upsertPricingEntries(roomTypeId, entries);
 
   return {
     roomTypeId,
-    startDate,
-    endDate,
-    price,
+    count: entries.length,
     modifiedCount: result.modifiedCount,
     upsertedCount: result.upsertedCount,
   };

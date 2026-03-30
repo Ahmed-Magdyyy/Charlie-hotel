@@ -1,14 +1,29 @@
 import { ApiError } from "../utils/ApiError.js";
 import { t } from "../i18n/index.js";
 
+const ALLOWED_ROUTE_PREFIXES = ["/api/v1/"];
+
 export const unmatchedRouteHandler = (req, res, next) => {
+  const url = req.originalUrl;
   const lang = req.lang || "en";
-  next(
-    new ApiError(
-      `${t("common.ROUTE_NOT_FOUND", lang)}: ${req.originalUrl}`,
-      400,
-    ),
+
+  // Check if the route belongs to a legitimate API prefix
+  const isLegitimate = ALLOWED_ROUTE_PREFIXES.some((prefix) =>
+    url.startsWith(prefix),
   );
+
+  if (isLegitimate) {
+    // This is a real API route that doesn't exist — log it
+    return next(
+      new ApiError(
+        `${t("common.ROUTE_NOT_FOUND", lang)}: ${req.originalUrl}`,
+        400,
+      ),
+    );
+  }
+
+  // Everything else is bot/scanner noise — reject silently
+  return res.status(404).json({ status: "fail", message: "Not found" });
 };
 
 const handelJwtInvalidSignature = (lang) =>

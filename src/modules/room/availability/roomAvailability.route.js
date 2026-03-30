@@ -26,7 +26,7 @@ router.get(
   getAvailabilityCalendar,
 );
 
-router.put(
+router.patch(
   "/:roomTypeId",
   requirePermission("rooms", "edit"),
   bulkSetAvailabilityValidator,

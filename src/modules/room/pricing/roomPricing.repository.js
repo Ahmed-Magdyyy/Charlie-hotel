@@ -17,31 +17,18 @@ export async function findPricingByRoomTypeAndDateRange(
 }
 
 /**
- * Bulk upsert daily prices for a room type across a date range.
+ * Bulk upsert daily prices for a room type from an array of { date, price } entries.
  */
-export async function upsertPricingForDateRange(
-  roomTypeId,
-  startDate,
-  endDate,
-  price,
-) {
-  const ops = [];
-  const current = new Date(startDate);
-  const end = new Date(endDate);
+export async function upsertPricingEntries(roomTypeId, entries) {
+  if (!entries || entries.length === 0) return { modifiedCount: 0, upsertedCount: 0 };
 
-  while (current <= end) {
-    const date = new Date(current);
-    ops.push({
-      updateOne: {
-        filter: { roomType: roomTypeId, date },
-        update: { $set: { price } },
-        upsert: true,
-      },
-    });
-    current.setUTCDate(current.getUTCDate() + 1);
-  }
-
-  if (ops.length === 0) return { modifiedCount: 0, upsertedCount: 0 };
+  const ops = entries.map(({ date, price }) => ({
+    updateOne: {
+      filter: { roomType: roomTypeId, date: new Date(date + "T00:00:00.000Z") },
+      update: { $set: { price } },
+      upsert: true,
+    },
+  }));
 
   return RoomPricingModel.bulkWrite(ops);
 }

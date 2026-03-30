@@ -1,5 +1,8 @@
 import { Router } from "express";
-import { getPricingCalendar, bulkSetPricing } from "./roomPricing.controller.js";
+import {
+  getPricingCalendar,
+  bulkSetPricing,
+} from "./roomPricing.controller.js";
 import { protect, requirePermission } from "../../auth/auth.middleware.js";
 import {
   getPricingValidator,
@@ -17,7 +20,7 @@ router.get(
   getPricingCalendar,
 );
 
-router.put(
+router.patch(
   "/:roomTypeId",
   requirePermission("rooms", "edit"),
   bulkSetPricingValidator,

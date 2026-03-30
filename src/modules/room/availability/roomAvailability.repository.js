@@ -53,10 +53,12 @@ export async function upsertAvailabilityForDateRange(
 
 /**
  * Atomically increment bookedRooms for a single date (used by booking module).
+ * If no record exists, creates one with totalRooms from the room type.
  * Returns null if the room is blocked or fully booked — caller must abort.
  */
-export async function incrementBookedRooms(roomTypeId, date, session) {
-  return RoomAvailabilityModel.findOneAndUpdate(
+export async function incrementBookedRooms(roomTypeId, date, totalRoomCount, session) {
+  // First try to increment an existing record
+  const result = await RoomAvailabilityModel.findOneAndUpdate(
     {
       roomType: roomTypeId,
       date,
@@ -66,6 +68,32 @@ export async function incrementBookedRooms(roomTypeId, date, session) {
     { $inc: { bookedRooms: 1 } },
     { new: true, session },
   );
+
+  if (result) return result;
+
+  // If no record exists, create one with defaults (only if not already existing & full)
+  const existing = await RoomAvailabilityModel.findOne(
+    { roomType: roomTypeId, date },
+    null,
+    { session },
+  ).lean();
+
+  // Record exists but is blocked or full — not available
+  if (existing) return null;
+
+  // No record at all — create with defaults, 1 booked
+  if (totalRoomCount <= 0) return null;
+
+  try {
+    const doc = await RoomAvailabilityModel.create(
+      [{ roomType: roomTypeId, date, totalRooms: totalRoomCount, bookedRooms: 1 }],
+      { session },
+    );
+    return doc[0];
+  } catch {
+    // Race condition: another transaction created it first
+    return null;
+  }
 }
 
 /**
@@ -84,37 +112,33 @@ export async function decrementBookedRooms(roomTypeId, date, session) {
 }
 
 /**
- * Search for room types that are available every night in a date range.
- * Returns roomType IDs that have availability > 0 for ALL nights.
+ * Find room type IDs that are explicitly blocked or fully booked on ANY night in a range.
+ * Used to exclude them from the "available by default" list.
  */
-export async function findAvailableRoomTypeIds(startDate, endDate) {
-  const start = new Date(startDate);
-  const end = new Date(endDate);
-  const totalNights = Math.round((end - start) / (1000 * 60 * 60 * 24));
-
-  if (totalNights <= 0) return [];
-
+export async function findUnavailableRoomTypeIds(startDate, endDate) {
   return RoomAvailabilityModel.aggregate([
     {
       $match: {
-        date: { $gte: start, $lt: end },
-        isBlocked: false,
-        $expr: { $gt: [{ $subtract: ["$totalRooms", "$bookedRooms"] }, 0] },
+        date: { $gte: startDate, $lt: endDate },
+        $or: [
+          { isBlocked: true },
+          { $expr: { $lte: [{ $subtract: ["$totalRooms", "$bookedRooms"] }, 0] } },
+        ],
       },
     },
     {
       $group: {
-        _id: "$roomType",
-        availableNights: { $sum: 1 },
+        _id: {
+          roomType: "$roomType",
+          date: "$date",
+        },
       },
     },
     {
-      $match: {
-        availableNights: totalNights,
+      $group: {
+        _id: "$_id.roomType",
+        unavailableDates: { $push: "$_id.date" },
       },
-    },
-    {
-      $project: { _id: 1 },
     },
   ]);
 }
