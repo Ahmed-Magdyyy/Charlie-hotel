@@ -12,8 +12,12 @@ const messages = { common, auth, user, room };
  * @param {string} [lang="en"] - Language code ("en" or "ar")
  * @returns {string} Translated message, falls back to English, then returns the raw key.
  */
-export function t(key, lang = "en") {
+export function t(key, lang = "en", vars = {}) {
   const [module, msgKey] = key.split(".");
   const msg = messages[module]?.[msgKey];
-  return msg?.[lang] || msg?.["en"] || key;
+  let text = msg?.[lang] || msg?.["en"] || key;
+  for (const [k, v] of Object.entries(vars)) {
+    text = text.replaceAll(`{{${k}}}`, v);
+  }
+  return text;
 }

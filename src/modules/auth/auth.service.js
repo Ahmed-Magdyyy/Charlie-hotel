@@ -64,7 +64,7 @@ const issueSessionTokens = async (user) => {
 
   return {
     accessToken,
-    refreshToken, // raw token — sent to client, never stored
+    refreshToken,
     accessTokenExpiresAt: getAccessTokenExpiresAt(),
   };
 };

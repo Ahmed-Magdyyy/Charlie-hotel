@@ -17,14 +17,13 @@ export async function findAvailabilityByRoomTypeAndDateRange(
 }
 
 /**
- * Bulk upsert availability for a room type across a date range.
- * Sets totalRooms and optionally isBlocked for each date.
+ * Bulk upsert blockedRooms for a room type across a date range.
  */
-export async function upsertAvailabilityForDateRange(
+export async function upsertBlockedRoomsForDateRange(
   roomTypeId,
   startDate,
   endDate,
-  { totalRooms, isBlocked },
+  blockedRooms,
 ) {
   const ops = [];
   const current = new Date(startDate);
@@ -32,14 +31,10 @@ export async function upsertAvailabilityForDateRange(
 
   while (current <= end) {
     const date = new Date(current);
-    const update = {};
-    if (totalRooms !== undefined) update.totalRooms = totalRooms;
-    if (isBlocked !== undefined) update.isBlocked = isBlocked;
-
     ops.push({
       updateOne: {
         filter: { roomType: roomTypeId, date },
-        update: { $set: update },
+        update: { $set: { blockedRooms } },
         upsert: true,
       },
     });
@@ -53,17 +48,23 @@ export async function upsertAvailabilityForDateRange(
 
 /**
  * Atomically increment bookedRooms for a single date (used by booking module).
- * If no record exists, creates one with totalRooms from the room type.
- * Returns null if the room is blocked or fully booked — caller must abort.
+ * If no record exists, creates one with 1 booked.
+ * Returns null if fully booked or blocked — caller must abort.
+ *
+ * available = totalRoomCount - bookedRooms - blockedRooms
  */
 export async function incrementBookedRooms(roomTypeId, date, totalRoomCount, session) {
-  // First try to increment an existing record
+  // Try to increment an existing record where there's still availability
   const result = await RoomAvailabilityModel.findOneAndUpdate(
     {
       roomType: roomTypeId,
       date,
-      isBlocked: false,
-      $expr: { $gt: [{ $subtract: ["$totalRooms", "$bookedRooms"] }, 0] },
+      $expr: {
+        $gt: [
+          { $subtract: [totalRoomCount, { $add: ["$bookedRooms", "$blockedRooms"] }] },
+          0,
+        ],
+      },
     },
     { $inc: { bookedRooms: 1 } },
     { new: true, session },
@@ -71,27 +72,25 @@ export async function incrementBookedRooms(roomTypeId, date, totalRoomCount, ses
 
   if (result) return result;
 
-  // If no record exists, create one with defaults (only if not already existing & full)
+  // Check if record exists but is full/blocked
   const existing = await RoomAvailabilityModel.findOne(
     { roomType: roomTypeId, date },
     null,
     { session },
   ).lean();
 
-  // Record exists but is blocked or full — not available
   if (existing) return null;
 
-  // No record at all — create with defaults, 1 booked
+  // No record — create with defaults, 1 booked
   if (totalRoomCount <= 0) return null;
 
   try {
     const doc = await RoomAvailabilityModel.create(
-      [{ roomType: roomTypeId, date, totalRooms: totalRoomCount, bookedRooms: 1 }],
+      [{ roomType: roomTypeId, date, bookedRooms: 1, blockedRooms: 0 }],
       { session },
     );
     return doc[0];
   } catch {
-    // Race condition: another transaction created it first
     return null;
   }
 }
@@ -112,33 +111,17 @@ export async function decrementBookedRooms(roomTypeId, date, session) {
 }
 
 /**
- * Find room type IDs that are explicitly blocked or fully booked on ANY night in a range.
- * Used to exclude them from the "available by default" list.
+ * Find room type IDs that are unavailable (fully booked + blocked >= totalRoomCount)
+ * on ANY night in a range. Used to exclude from search results.
+ *
+ * We pass totalRoomCount per room type from the caller via a lookup,
+ * but since we don't know it here, we return all records with issues
+ * and let the service layer filter with totalRoomCount.
  */
-export async function findUnavailableRoomTypeIds(startDate, endDate) {
-  return RoomAvailabilityModel.aggregate([
-    {
-      $match: {
-        date: { $gte: startDate, $lt: endDate },
-        $or: [
-          { isBlocked: true },
-          { $expr: { $lte: [{ $subtract: ["$totalRooms", "$bookedRooms"] }, 0] } },
-        ],
-      },
-    },
-    {
-      $group: {
-        _id: {
-          roomType: "$roomType",
-          date: "$date",
-        },
-      },
-    },
-    {
-      $group: {
-        _id: "$_id.roomType",
-        unavailableDates: { $push: "$_id.date" },
-      },
-    },
-  ]);
+export async function findAvailabilityRecordsInRange(startDate, endDate) {
+  return RoomAvailabilityModel.find({
+    date: { $gte: startDate, $lt: endDate },
+  })
+    .sort({ roomType: 1, date: 1 })
+    .lean();
 }

@@ -11,19 +11,15 @@ const roomAvailabilitySchema = new mongoose.Schema(
       type: Date,
       required: [true, "Date is required"],
     },
-    totalRooms: {
-      type: Number,
-      required: [true, "Total rooms is required"],
-      min: 0,
-    },
     bookedRooms: {
       type: Number,
       default: 0,
       min: 0,
     },
-    isBlocked: {
-      type: Boolean,
-      default: false,
+    blockedRooms: {
+      type: Number,
+      default: 0,
+      min: 0,
     },
   },
   { timestamps: true },

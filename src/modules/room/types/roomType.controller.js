@@ -23,7 +23,7 @@ export const getRoomTypes = asyncHandler(async (req, res) => {
 
 // GET /api/v1/rooms/types/:id
 export const getRoomType = asyncHandler(async (req, res) => {
-  const roomType = await getRoomTypeByIdService(req.params.id, req.lang, req.query);
+  const roomType = await getRoomTypeByIdService(req.params.roomTypeId, req.lang, req.query);
   res.status(200).json({ data: roomType });
 });
 
@@ -40,7 +40,7 @@ export const createRoomType = asyncHandler(async (req, res) => {
 // PATCH /api/v1/rooms/types/:id
 export const updateRoomType = asyncHandler(async (req, res) => {
   const roomType = await updateRoomTypeService(
-    req.params.id,
+    req.params.roomTypeId,
     req.body,
     req.files,
     req.lang,
@@ -50,6 +50,6 @@ export const updateRoomType = asyncHandler(async (req, res) => {
 
 // DELETE /api/v1/rooms/types/:id
 export const deleteRoomType = asyncHandler(async (req, res) => {
-  await deleteRoomTypeService(req.params.id, req.lang);
+  await deleteRoomTypeService(req.params.roomTypeId, req.lang);
   res.status(200).json({ message: t("room.ROOM_DELETED", req.lang) });
 });

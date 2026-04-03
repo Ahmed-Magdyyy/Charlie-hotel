@@ -28,11 +28,7 @@ export async function getPricingCalendarService(roomTypeId, query) {
 
   const end = endDate
     ? new Date(endDate + "T00:00:00.000Z")
-    : new Date(
-        new Date(start.getFullYear(), start.getMonth() + 1, 0)
-          .toISOString()
-          .slice(0, 10) + "T00:00:00.000Z",
-      );
+    : new Date(Date.UTC(start.getUTCFullYear(), start.getUTCMonth() + 1, 0));
 
   const overrides = await findPricingByRoomTypeAndDateRange(
     roomTypeId,

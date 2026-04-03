@@ -1,7 +1,7 @@
 import asyncHandler from "express-async-handler";
 import {
   getAvailabilityCalendarService,
-  bulkSetAvailabilityService,
+  blockRoomsService,
   searchAvailableRoomsService,
 } from "./roomAvailability.service.js";
 
@@ -15,9 +15,9 @@ export const getAvailabilityCalendar = asyncHandler(async (req, res) => {
   res.status(200).json({ status: "success", data });
 });
 
-// PUT /api/v1/rooms/availability/:roomTypeId
-export const bulkSetAvailability = asyncHandler(async (req, res) => {
-  const data = await bulkSetAvailabilityService(
+// PATCH /api/v1/rooms/availability/:roomTypeId
+export const blockRooms = asyncHandler(async (req, res) => {
+  const data = await blockRoomsService(
     req.params.roomTypeId,
     req.body,
     req.lang,

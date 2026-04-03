@@ -95,7 +95,7 @@ export async function createUserService(payload, lang) {
     email,
     phone,
     passwordHash: password,
-    role: role || "client",
+    role: role || roles.GUEST,
     isActive: true, // Auto-active if created by Admin
     account_status: accountStatus.CONFIRMED,
     emailVerified: true, // Trust admin creation

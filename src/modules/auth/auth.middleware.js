@@ -60,7 +60,7 @@ export const allowedTo = (...allowedRoles) =>
     next();
   });
 
-export const requirePermission = (resource, action) =>
+export const requirePermission = (resource, ...actions) =>
   asyncHandler(async (req, res, next) => {
     const lang = req.lang || "en";
     const user = req.user;
@@ -78,12 +78,14 @@ export const requirePermission = (resource, action) =>
       throw new ApiError(t("common.NO_PERMISSION", lang), 403);
     }
 
-    // Check the structured permission: permissions.get('rooms')?.read
+    // Check the structured permission: user needs ANY of the listed actions
     const modulePerms = user.permissions?.get(resource);
 
-    if (!modulePerms || !modulePerms[action]) {
+    const hasPermission = modulePerms && actions.some((action) => modulePerms[action]);
+
+    if (!hasPermission) {
       throw new ApiError(
-        `${t("common.PERMISSION_MISSING", lang)}: ${action}:${resource}`,
+        `${t("common.PERMISSION_MISSING", lang)}: ${actions.join("|")}:${resource}`,
         403,
       );
     }

@@ -6,6 +6,8 @@ import {
   reservationOptionTypes,
   cancellationPolicyTypes,
   paymentOptionTypes,
+  smokingPolicies,
+  accessibilityFeatures as accessibilityEnum,
 } from "../../../shared/constants/enums.js";
 
 // ─── Sub-schemas ────────────────────────────────────────────
@@ -90,6 +92,10 @@ const roomTypeSchema = new mongoose.Schema(
       ar: { type: String, trim: true },
     },
     description: localizedString,
+    roomSize: {
+      type: Number,
+      min: 0,
+    },
     maxGuests: {
       type: Number,
       required: [true, "Max guests is required"],
@@ -112,6 +118,17 @@ const roomTypeSchema = new mongoose.Schema(
       {
         type: String,
         enum: Object.values(roomViews),
+      },
+    ],
+    smokingPolicy: {
+      type: String,
+      enum: Object.values(smokingPolicies),
+      default: smokingPolicies.NON_SMOKING,
+    },
+    accessibilityFeatures: [
+      {
+        type: String,
+        enum: Object.values(accessibilityEnum),
       },
     ],
     images: [imageSchema],

@@ -37,7 +37,7 @@ const userSchema = new mongoose.Schema(
     role: {
       type: String,
       enum: Object.values(roles),
-      default: roles.CLIENT,
+      default: roles.GUEST,
     },
     position: {
       type: String,

@@ -19,10 +19,13 @@ import {
   bedTypes,
   roomViews,
   amenities as amenitiesEnum,
+  amenityCategoryMap,
   reservationOptionTypes,
   cancellationPolicyTypes,
   paymentOptionTypes,
   cancellationDeadlines,
+  smokingPolicies,
+  accessibilityFeatures as accessibilityEnum,
 } from "../../../shared/constants/enums.js";
 
 const CLOUDINARY_FOLDER = "charlie-hotel/room-types";
@@ -96,6 +99,22 @@ function resolveRoomTypeLabels(roomType, lang = "en") {
     }));
   }
 
+  // Smoking policy — add label
+  if (obj.smokingPolicy) {
+    obj.smokingPolicy = {
+      key: obj.smokingPolicy,
+      label: resolveLabel("SMOKING", obj.smokingPolicy, lang),
+    };
+  }
+
+  // Accessibility features — transform to objects with label
+  if (obj.accessibilityFeatures) {
+    obj.accessibilityFeatures = obj.accessibilityFeatures.map((key) => ({
+      key,
+      label: resolveLabel("ACCESSIBILITY", key, lang),
+    }));
+  }
+
   return obj;
 }
 
@@ -149,10 +168,23 @@ export function getRoomConfigService(lang) {
       label: resolveLabel(prefix, key, lang),
     }));
 
+  // Group amenities by category
+  const amenitiesByCategory = {};
+  for (const key of Object.values(amenitiesEnum)) {
+    const category = amenityCategoryMap[key] || "general";
+    if (!amenitiesByCategory[category]) amenitiesByCategory[category] = [];
+    amenitiesByCategory[category].push({
+      key,
+      label: resolveLabel("AMENITY", key, lang),
+    });
+  }
+
   return {
     bedTypes: buildOptions("BED_TYPE", bedTypes),
-    amenities: buildOptions("AMENITY", amenitiesEnum),
+    amenities: amenitiesByCategory,
     views: buildOptions("VIEW", roomViews),
+    smokingPolicies: buildOptions("SMOKING", smokingPolicies),
+    accessibilityFeatures: buildOptions("ACCESSIBILITY", accessibilityEnum),
     reservationOptions: buildOptions("RESERVATION", reservationOptionTypes),
     cancellationPolicies: Object.values(cancellationPolicyTypes).map((key) => ({
       key,
@@ -171,11 +203,14 @@ export async function createRoomTypeService(payload, files, lang) {
     name_ar,
     description_en,
     description_ar,
+    roomSize,
     maxGuests,
     basePrice,
     beds,
     amenities,
     views,
+    smokingPolicy,
+    accessibilityFeatures,
     reservationOptions,
     cancellationPolicies,
     paymentOptions,
@@ -186,6 +221,7 @@ export async function createRoomTypeService(payload, files, lang) {
   const parsedBeds = parseJsonField(beds, "beds");
   const parsedAmenities = parseJsonField(amenities, "amenities");
   const parsedViews = parseJsonField(views, "views");
+  const parsedAccessibility = parseJsonField(accessibilityFeatures, "accessibilityFeatures");
   const parsedReservationOptions = parseJsonField(
     reservationOptions,
     "reservationOptions",
@@ -207,11 +243,14 @@ export async function createRoomTypeService(payload, files, lang) {
         ...(description_ar && { ar: description_ar }),
       },
     }),
+    ...(roomSize !== undefined && { roomSize }),
     maxGuests,
     basePrice,
     ...(parsedBeds && { beds: parsedBeds }),
     ...(parsedAmenities && { amenities: parsedAmenities }),
     ...(parsedViews && { views: parsedViews }),
+    ...(smokingPolicy && { smokingPolicy }),
+    ...(parsedAccessibility && { accessibilityFeatures: parsedAccessibility }),
     ...(images.length > 0 && { images }),
     ...(parsedReservationOptions && {
       reservationOptions: parsedReservationOptions,
@@ -292,11 +331,14 @@ export async function updateRoomTypeService(id, payload, files, lang) {
     name_ar,
     description_en,
     description_ar,
+    roomSize,
     maxGuests,
     basePrice,
     beds,
     amenities,
     views,
+    smokingPolicy,
+    accessibilityFeatures,
     reservationOptions,
     cancellationPolicies,
     paymentOptions,
@@ -315,8 +357,10 @@ export async function updateRoomTypeService(id, payload, files, lang) {
     if (!roomType.description) roomType.description = {};
     roomType.description.ar = description_ar;
   }
+  if (roomSize !== undefined) roomType.roomSize = roomSize;
   if (maxGuests !== undefined) roomType.maxGuests = maxGuests;
   if (basePrice !== undefined) roomType.basePrice = basePrice;
+  if (smokingPolicy !== undefined) roomType.smokingPolicy = smokingPolicy;
   if (totalRoomCount !== undefined) roomType.totalRoomCount = totalRoomCount;
   if (isActive !== undefined) roomType.isActive = isActive;
 
@@ -329,6 +373,9 @@ export async function updateRoomTypeService(id, payload, files, lang) {
 
   const parsedViews = parseJsonField(views, "views");
   if (parsedViews !== undefined) roomType.views = parsedViews;
+
+  const parsedAccessibility = parseJsonField(accessibilityFeatures, "accessibilityFeatures");
+  if (parsedAccessibility !== undefined) roomType.accessibilityFeatures = parsedAccessibility;
 
   const parsedReservationOptions = parseJsonField(
     reservationOptions,

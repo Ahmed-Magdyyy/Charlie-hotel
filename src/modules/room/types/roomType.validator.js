@@ -20,13 +20,19 @@ export const createRoomTypeValidator = [
     .isInt({ min: 1 })
     .withMessage("Max guests must be at least 1"),
 
+  body("roomSize")
+    .optional()
+    .isFloat({ min: 1 })
+    .withMessage("Room size must be a positive number (sqm)"),
+
   body("basePrice")
     .notEmpty()
     .withMessage("Base price is required")
     .isFloat({ min: 0 })
     .withMessage("Base price must be 0 or more"),
 
-  // beds, amenities, views, reservationOptions, cancellationPolicies, paymentOptions
+  // beds, amenities, views, smokingPolicy, accessibilityFeatures,
+  // reservationOptions, cancellationPolicies, paymentOptions
   // are sent as JSON strings — validated and parsed in the service layer
 
   body("totalRoomCount")
@@ -38,7 +44,7 @@ export const createRoomTypeValidator = [
 ];
 
 export const updateRoomTypeValidator = [
-  param("id").isMongoId().withMessage("Invalid room type id"),
+  param("roomTypeId").isMongoId().withMessage("Invalid room type id"),
 
   body("name_en")
     .optional()
@@ -54,6 +60,11 @@ export const updateRoomTypeValidator = [
     .optional()
     .isInt({ min: 1 })
     .withMessage("Max guests must be at least 1"),
+
+  body("roomSize")
+    .optional()
+    .isFloat({ min: 1 })
+    .withMessage("Room size must be a positive number (sqm)"),
 
   body("basePrice")
     .optional()
@@ -71,6 +82,6 @@ export const updateRoomTypeValidator = [
 ];
 
 export const getRoomTypeValidator = [
-  param("id").isMongoId().withMessage("Invalid room type id"),
+  param("roomTypeId").isMongoId().withMessage("Invalid room type id"),
   validatorMiddleware,
 ];

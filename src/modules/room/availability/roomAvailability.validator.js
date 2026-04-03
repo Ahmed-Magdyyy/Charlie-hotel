@@ -14,7 +14,7 @@ export const getAvailabilityValidator = [
   validatorMiddleware,
 ];
 
-export const bulkSetAvailabilityValidator = [
+export const blockRoomsValidator = [
   param("roomTypeId").isMongoId().withMessage("Invalid room type ID"),
   body("startDate")
     .notEmpty()
@@ -26,14 +26,11 @@ export const bulkSetAvailabilityValidator = [
     .withMessage("endDate is required")
     .isISO8601({ strict: true, strictSeparator: true })
     .withMessage("endDate must be a valid date (YYYY-MM-DD)"),
-  body("totalRooms")
-    .optional()
+  body("blockedRooms")
+    .notEmpty()
+    .withMessage("blockedRooms is required")
     .isInt({ min: 0 })
-    .withMessage("totalRooms must be a non-negative integer"),
-  body("isBlocked")
-    .optional()
-    .isBoolean()
-    .withMessage("isBlocked must be a boolean"),
+    .withMessage("blockedRooms must be a non-negative integer"),
   validatorMiddleware,
 ];
 
