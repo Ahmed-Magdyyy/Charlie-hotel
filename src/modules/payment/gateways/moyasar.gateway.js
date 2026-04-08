@@ -58,6 +58,7 @@ const moyasarGateway = {
     if (!callbackUrl) throw new Error("MOYASAR_CALLBACK_URL is not set");
 
     // Use Invoice API — creates a hosted checkout page (no PCI requirement)
+    const successUrl = process.env.MOYASAR_SUCCESS_URL || callbackUrl;
     const data = await moyasarFetch("/invoices", {
       method: "POST",
       body: JSON.stringify({
@@ -65,6 +66,8 @@ const moyasarGateway = {
         currency,
         description,
         callback_url: callbackUrl,
+        success_url: successUrl,
+        back_url: process.env.MOYASAR_BACK_URL || undefined,
         metadata: { bookingId },
       }),
     });

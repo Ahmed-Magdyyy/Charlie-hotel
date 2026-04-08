@@ -29,6 +29,7 @@ import {
   refundPointsService,
   earnPointsService,
 } from "../loyalty/loyalty.service.js";
+import { initiatePaymentService } from "../payment/payment.service.js";
 
 const PENDING_EXPIRY_MINUTES = 15;
 
@@ -212,6 +213,20 @@ export async function createBookingService(body, user, lang) {
     }
 
     await session.commitTransaction();
+
+    // 8. Auto-initiate payment for pay_now bookings
+    if (isPay) {
+      const paymentData = await initiatePaymentService(
+        { bookingId: booking._id.toString() },
+        user,
+        lang,
+      );
+      return {
+        ...booking.toObject(),
+        url: paymentData.checkoutUrl,
+      };
+    }
+
     return booking;
   } catch (err) {
     if (session.inTransaction()) await session.abortTransaction();
