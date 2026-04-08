@@ -117,26 +117,43 @@ const moyasarGateway = {
    * @throws {Error} if signature verification fails
    */
   parseWebhook(reqBody) {
-    // Moyasar doesn't send auth headers on webhooks.
-    // Instead of trusting the webhook body, we extract the payment/invoice ID
-    // and verify it by calling Moyasar's API directly.
-    const data = reqBody;
+    // Moyasar sends two webhook formats:
+    // 1. Invoice webhook: { id, status, metadata, payments, ... }
+    // 2. Payment event webhook: { id, type, secret_token, data: { id, invoice_id, metadata, ... } }
 
-    // Moyasar webhook may nest the payment data or send it flat
-    // Also check if this is a payment event containing an invoice reference
-    const bookingId =
-      data.metadata?.bookingId ||
-      data.invoice?.metadata?.bookingId ||
-      null;
+    const raw = reqBody;
+    let gatewayPaymentId;
+    let invoiceId = null;
+    let bookingId = null;
 
-    console.log("[Moyasar Webhook] Body keys:", Object.keys(data), "id:", data.id, "bookingId:", bookingId);
+    if (raw.payments && raw.metadata) {
+      // Format 1: Invoice webhook — id IS the invoice ID
+      gatewayPaymentId = raw.id;
+      invoiceId = raw.id;
+      bookingId = raw.metadata?.bookingId || null;
+    } else if (raw.data) {
+      // Format 2: Payment event — real data is nested in raw.data
+      const inner = raw.data;
+      gatewayPaymentId = inner.id || raw.id;
+      invoiceId = inner.invoice_id || null;
+      bookingId = inner.metadata?.bookingId || null;
+
+      // Verify secret_token if configured
+      const webhookSecret = process.env.MOYASAR_WEBHOOK_SECRET;
+      if (webhookSecret && raw.secret_token !== webhookSecret) {
+        throw new Error("Invalid webhook secret token");
+      }
+    } else {
+      gatewayPaymentId = raw.id;
+      bookingId = raw.metadata?.bookingId || null;
+    }
 
     return {
-      gatewayPaymentId: data.id,
-      invoiceId: data.invoice_id || data.invoice?.id || null,
+      gatewayPaymentId,
+      invoiceId,
       bookingId,
       needsVerification: true,
-      raw: data,
+      raw,
     };
   },
 
