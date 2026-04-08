@@ -59,21 +59,21 @@ const moyasarGateway = {
     const callbackUrl = process.env.MOYASAR_CALLBACK_URL;
     if (!callbackUrl) throw new Error("MOYASAR_CALLBACK_URL is not set");
 
-    const data = await moyasarFetch("/payments", {
+    // Use Invoice API — creates a hosted checkout page (no PCI requirement)
+    const data = await moyasarFetch("/invoices", {
       method: "POST",
       body: JSON.stringify({
-        amount: Math.round(amount * 100), // Moyasar expects amount in halalah (smallest unit)
+        amount: Math.round(amount * 100), // Moyasar expects amount in halalah
         currency,
         description,
         callback_url: callbackUrl,
         metadata: { bookingId },
-        source: { type: "creditcard" }, // Moyasar will show their payment form
       }),
     });
 
     return {
       gatewayPaymentId: data.id,
-      checkoutUrl: data.source?.transaction_url || data.source?.url || null,
+      checkoutUrl: data.url,
       raw: data,
     };
   },
@@ -84,14 +84,26 @@ const moyasarGateway = {
    * @returns {Promise<VerifyResult>}
    */
   async verify(gatewayPaymentId) {
-    const data = await moyasarFetch(`/payments/${gatewayPaymentId}`);
-
-    return {
-      paid: data.status === "paid",
-      gatewayPaymentId: data.id,
-      method: mapMoyasarMethod(data.source?.type),
-      raw: data,
-    };
+    // Try as invoice first, fallback to payment
+    try {
+      const data = await moyasarFetch(`/invoices/${gatewayPaymentId}`);
+      const payment = data.payments?.[0];
+      return {
+        paid: data.status === "paid",
+        gatewayPaymentId: data.id,
+        method: payment ? mapMoyasarMethod(payment.source?.type) : "credit_card",
+        raw: data,
+      };
+    } catch {
+      // Fallback: try as a direct payment ID
+      const data = await moyasarFetch(`/payments/${gatewayPaymentId}`);
+      return {
+        paid: data.status === "paid",
+        gatewayPaymentId: data.id,
+        method: mapMoyasarMethod(data.source?.type),
+        raw: data,
+      };
+    }
   },
 
   /**
