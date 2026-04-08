@@ -71,7 +71,7 @@ export async function initiatePaymentService(body, user, lang) {
 
 export async function handleWebhookService(reqBody, reqHeaders, rawBody) {
   const gateway = getGateway();
-  const result = gateway.parseWebhook(reqBody, reqHeaders, rawBody);
+  let result = gateway.parseWebhook(reqBody, reqHeaders, rawBody);
 
   // Find the payment by gateway ID
   const payment = await findPaymentByGatewayId(result.gatewayPaymentId);
@@ -83,6 +83,12 @@ export async function handleWebhookService(reqBody, reqHeaders, rawBody) {
   // Already processed (idempotency guard)
   if (payment.status === "paid" || payment.status === "refunded") {
     return { acknowledged: true };
+  }
+
+  // Moyasar sends no auth headers — verify payment status directly via API
+  if (result.needsVerification) {
+    const verified = await gateway.verify(result.gatewayPaymentId);
+    result = { ...result, paid: verified.paid, method: verified.method, raw: verified.raw };
   }
 
   const session = await mongoose.startSession();

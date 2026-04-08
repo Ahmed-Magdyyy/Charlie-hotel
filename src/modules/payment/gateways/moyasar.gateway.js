@@ -11,8 +11,6 @@
  *   MOYASAR_BASE_URL        - (optional) defaults to https://api.moyasar.com/v1
  */
 
-import crypto from "crypto";
-
 const BASE_URL = process.env.MOYASAR_BASE_URL || "https://api.moyasar.com/v1";
 
 function getAuthHeader() {
@@ -120,61 +118,15 @@ const moyasarGateway = {
     // Moyasar sends the secret token via Basic Auth header: "Basic base64(secret_token:)"
     const webhookSecret = process.env.MOYASAR_WEBHOOK_SECRET;
 
-    if (webhookSecret) {
-      // Debug: log headers to identify Moyasar's auth format (remove after confirming)
-      console.log("[Moyasar Webhook] Headers:", JSON.stringify({
-        authorization: reqHeaders["authorization"],
-        "x-moyasar-signature": reqHeaders["x-moyasar-signature"],
-        "x-signature": reqHeaders["x-signature"],
-        "x-webhook-secret": reqHeaders["x-webhook-secret"],
-        "secret-token": reqHeaders["secret-token"],
-      }));
-
-      const authHeader = reqHeaders["authorization"] || "";
-      let authenticated = false;
-
-      // Check Basic Auth: "Basic base64(token:)"
-      if (authHeader.startsWith("Basic ")) {
-        const decoded = Buffer.from(authHeader.slice(6), "base64").toString("utf8");
-        const token = decoded.split(":")[0];
-        authenticated =
-          token.length === webhookSecret.length &&
-          crypto.timingSafeEqual(Buffer.from(token), Buffer.from(webhookSecret));
-      }
-
-      // Check Bearer: "Bearer token"
-      if (!authenticated && authHeader.startsWith("Bearer ")) {
-        const token = authHeader.slice(7);
-        authenticated =
-          token.length === webhookSecret.length &&
-          crypto.timingSafeEqual(Buffer.from(token), Buffer.from(webhookSecret));
-      }
-
-      // Check custom headers
-      if (!authenticated) {
-        const customToken =
-          reqHeaders["x-webhook-secret"] ||
-          reqHeaders["secret-token"] ||
-          reqHeaders["x-moyasar-signature"];
-        if (customToken) {
-          authenticated =
-            customToken.length === webhookSecret.length &&
-            crypto.timingSafeEqual(Buffer.from(customToken), Buffer.from(webhookSecret));
-        }
-      }
-
-      if (!authenticated) {
-        throw new Error("Invalid webhook authorization");
-      }
-    }
-
+    // Moyasar doesn't send auth headers on webhooks.
+    // Instead of trusting the webhook body, we extract the payment ID
+    // and verify it by calling Moyasar's API directly.
     const data = reqBody;
 
     return {
-      paid: data.status === "paid",
       gatewayPaymentId: data.id,
-      method: mapMoyasarMethod(data.source?.type),
       bookingId: data.metadata?.bookingId || null,
+      needsVerification: true, // signal to service layer to call verify()
       raw: data,
     };
   },
