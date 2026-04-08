@@ -73,10 +73,15 @@ export async function handleWebhookService(reqBody, reqHeaders, rawBody) {
   const gateway = getGateway();
   let result = gateway.parseWebhook(reqBody, reqHeaders, rawBody);
 
-  // Find the payment by gateway ID
-  const payment = await findPaymentByGatewayId(result.gatewayPaymentId);
+  // Find the payment — try by gateway ID first, then by booking ID from metadata
+  // (Invoice API: we store the invoice ID, but webhook sends the payment ID)
+  let payment = await findPaymentByGatewayId(result.gatewayPaymentId);
+  if (!payment && result.bookingId) {
+    const payments = await findPaymentsByBooking(result.bookingId);
+    payment = payments.find((p) => p.status === "initiated") || payments[0];
+  }
   if (!payment) {
-    console.warn(`[Payment Webhook] Unknown gatewayPaymentId: ${result.gatewayPaymentId}`);
+    console.warn(`[Payment Webhook] Unknown payment — gatewayId: ${result.gatewayPaymentId}, bookingId: ${result.bookingId}`);
     return { acknowledged: true };
   }
 
@@ -86,8 +91,10 @@ export async function handleWebhookService(reqBody, reqHeaders, rawBody) {
   }
 
   // Moyasar sends no auth headers — verify payment status directly via API
+  // Use the stored gateway ID (invoice ID) for verification, not the webhook's payment ID
   if (result.needsVerification) {
-    const verified = await gateway.verify(result.gatewayPaymentId);
+    const verifyId = payment.gatewayPaymentId || result.gatewayPaymentId;
+    const verified = await gateway.verify(verifyId);
     result = { ...result, paid: verified.paid, method: verified.method, raw: verified.raw };
   }
 
