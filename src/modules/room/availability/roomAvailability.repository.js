@@ -67,7 +67,7 @@ export async function incrementBookedRooms(roomTypeId, date, totalRoomCount, ses
       },
     },
     { $inc: { bookedRooms: 1 } },
-    { new: true, session },
+    { returnDocument: "after", session },
   );
 
   if (result) return result;
@@ -160,7 +160,7 @@ export async function decrementBookedRooms(roomTypeId, date, session) {
       bookedRooms: { $gt: 0 },
     },
     { $inc: { bookedRooms: -1 } },
-    { new: true, session },
+    { returnDocument: "after", session },
   );
 }
 

@@ -103,7 +103,7 @@ export async function findExpiredPendingBookings() {
  */
 export async function updateBookingById(id, update, session) {
   return BookingModel.findByIdAndUpdate(id, update, {
-    new: true,
+    returnDocument: "after",
     session,
   });
 }

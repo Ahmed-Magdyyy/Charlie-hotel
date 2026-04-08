@@ -56,7 +56,7 @@ export async function earnPointsService(userId, bookingId, grandTotal, session) 
   const user = await UserModel.findByIdAndUpdate(
     userId,
     { $inc: { loyaltyPoints: points } },
-    { new: true, session },
+    { returnDocument: "after", session },
   );
 
   await createLoyaltyTransaction(
@@ -83,7 +83,7 @@ export async function redeemPointsService(userId, bookingId, pointsToRedeem, ses
   const user = await UserModel.findByIdAndUpdate(
     userId,
     { $inc: { loyaltyPoints: -pointsToRedeem } },
-    { new: true, session },
+    { returnDocument: "after", session },
   );
 
   await createLoyaltyTransaction(
@@ -107,7 +107,7 @@ export async function refundPointsService(userId, bookingId, pointsToRefund, ses
   const user = await UserModel.findByIdAndUpdate(
     userId,
     { $inc: { loyaltyPoints: pointsToRefund } },
-    { new: true, session },
+    { returnDocument: "after", session },
   );
 
   await createLoyaltyTransaction(
@@ -147,7 +147,7 @@ export async function adjustPointsService(body, adminUser, lang) {
     const updated = await UserModel.findByIdAndUpdate(
       userId,
       { $inc: { loyaltyPoints: points } },
-      { new: true, session },
+      { returnDocument: "after", session },
     );
 
     await createLoyaltyTransaction(

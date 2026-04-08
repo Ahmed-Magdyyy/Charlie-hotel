@@ -115,7 +115,7 @@ export async function handleWebhookService(reqBody) {
           gatewayResponse: result.raw,
           paidAt: new Date(),
         },
-        { new: true, session },
+        { returnDocument: "after", session },
       );
 
       if (!updated) {

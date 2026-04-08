@@ -34,5 +34,5 @@ export async function countPayments(filter = {}) {
 }
 
 export async function updatePaymentById(id, update) {
-  return PaymentModel.findByIdAndUpdate(id, update, { new: true });
+  return PaymentModel.findByIdAndUpdate(id, update, { returnDocument: "after" });
 }

@@ -14,7 +14,7 @@ export async function getLoyaltyConfig() {
 
 export async function updateLoyaltyConfig(update) {
   return LoyaltyConfigModel.findOneAndUpdate({}, { $set: update }, {
-    new: true,
+    returnDocument: "after",
     upsert: true,
     lean: true,
   });

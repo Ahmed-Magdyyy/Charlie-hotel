@@ -21,6 +21,20 @@ const router = Router();
 // ─── Public (gateway webhook — no auth) ─────────────────────
 router.post("/webhook", paymentWebhook);
 
+// Moyasar redirects the user's browser here after payment (GET with query params)
+router.get("/callback", (req, res) => {
+  const { id, status, message, invoice_id } = req.query;
+  const isPaid = status === "paid";
+  res.status(200).json({
+    status: "success",
+    data: {
+      paymentStatus: isPaid ? "paid" : "failed",
+      message: isPaid ? "Payment completed successfully" : message || "Payment failed",
+      invoiceId: invoice_id || id,
+    },
+  });
+});
+
 // ─── Authenticated ──────────────────────────────────────────
 router.use(protect);
 
