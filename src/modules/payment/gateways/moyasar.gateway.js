@@ -121,16 +121,46 @@ const moyasarGateway = {
     const webhookSecret = process.env.MOYASAR_WEBHOOK_SECRET;
 
     if (webhookSecret) {
+      // Debug: log headers to identify Moyasar's auth format (remove after confirming)
+      console.log("[Moyasar Webhook] Headers:", JSON.stringify({
+        authorization: reqHeaders["authorization"],
+        "x-moyasar-signature": reqHeaders["x-moyasar-signature"],
+        "x-signature": reqHeaders["x-signature"],
+        "x-webhook-secret": reqHeaders["x-webhook-secret"],
+        "secret-token": reqHeaders["secret-token"],
+      }));
+
       const authHeader = reqHeaders["authorization"] || "";
       let authenticated = false;
 
+      // Check Basic Auth: "Basic base64(token:)"
       if (authHeader.startsWith("Basic ")) {
-        // Moyasar sends Basic auth with secret_token as username
         const decoded = Buffer.from(authHeader.slice(6), "base64").toString("utf8");
         const token = decoded.split(":")[0];
         authenticated =
           token.length === webhookSecret.length &&
           crypto.timingSafeEqual(Buffer.from(token), Buffer.from(webhookSecret));
+      }
+
+      // Check Bearer: "Bearer token"
+      if (!authenticated && authHeader.startsWith("Bearer ")) {
+        const token = authHeader.slice(7);
+        authenticated =
+          token.length === webhookSecret.length &&
+          crypto.timingSafeEqual(Buffer.from(token), Buffer.from(webhookSecret));
+      }
+
+      // Check custom headers
+      if (!authenticated) {
+        const customToken =
+          reqHeaders["x-webhook-secret"] ||
+          reqHeaders["secret-token"] ||
+          reqHeaders["x-moyasar-signature"];
+        if (customToken) {
+          authenticated =
+            customToken.length === webhookSecret.length &&
+            crypto.timingSafeEqual(Buffer.from(customToken), Buffer.from(webhookSecret));
+        }
       }
 
       if (!authenticated) {
