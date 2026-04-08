@@ -116,22 +116,25 @@ const moyasarGateway = {
    * @throws {Error} if signature verification fails
    */
   parseWebhook(reqBody, reqHeaders, rawBody) {
-    // Verify webhook signature
+    // Verify webhook secret token
+    // Moyasar sends the secret token via Basic Auth header: "Basic base64(secret_token:)"
     const webhookSecret = process.env.MOYASAR_WEBHOOK_SECRET;
-    const signature = reqHeaders["x-moyasar-signature"] || reqHeaders["x-signature"];
 
     if (webhookSecret) {
-      if (!signature) {
-        throw new Error("Missing webhook signature header");
+      const authHeader = reqHeaders["authorization"] || "";
+      let authenticated = false;
+
+      if (authHeader.startsWith("Basic ")) {
+        // Moyasar sends Basic auth with secret_token as username
+        const decoded = Buffer.from(authHeader.slice(6), "base64").toString("utf8");
+        const token = decoded.split(":")[0];
+        authenticated =
+          token.length === webhookSecret.length &&
+          crypto.timingSafeEqual(Buffer.from(token), Buffer.from(webhookSecret));
       }
 
-      const expectedSignature = crypto
-        .createHmac("sha256", webhookSecret)
-        .update(rawBody)
-        .digest("hex");
-
-      if (!crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expectedSignature))) {
-        throw new Error("Invalid webhook signature");
+      if (!authenticated) {
+        throw new Error("Invalid webhook authorization");
       }
     }
 
