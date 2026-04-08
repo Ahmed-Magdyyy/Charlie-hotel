@@ -1,0 +1,527 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Charlie Hotel API - Bookings & Payments",
+    "version": "1.0.0"
+  },
+  "paths": {
+    "/api/v1/bookings/calculate": {
+      "post": {
+        "summary": "calculate booking price",
+        "deprecated": false,
+        "description": "Public. Preview price breakdown before creating a booking.",
+        "tags": ["Bookings"],
+        "parameters": [
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "required": true,
+            "example": "ar",
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "roomTypeId": { "example": "69b62cecf746a7138434a76d", "type": "string" },
+                  "checkIn": { "example": "2026-05-01", "type": "string" },
+                  "checkOut": { "example": "2026-05-04", "type": "string" },
+                  "reservationOption": { "example": "breakfast", "type": "string" },
+                  "cancellationPolicy": { "example": "free_cancellation", "type": "string" },
+                  "paymentOption": { "example": "pay_now", "type": "string" },
+                  "loyaltyPointsToRedeem": { "example": 100, "type": "number" }
+                },
+                "required": ["roomTypeId", "checkIn", "checkOut", "reservationOption", "cancellationPolicy", "paymentOption"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": { "application/json": { "schema": { "type": "object", "properties": {} } } }
+          }
+        },
+        "security": []
+      }
+    },
+    "/api/v1/bookings": {
+      "post": {
+        "summary": "create booking",
+        "deprecated": false,
+        "description": "Client only. Creates a booking and holds inventory.",
+        "tags": ["Bookings"],
+        "parameters": [
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "required": true,
+            "example": "ar",
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "roomTypeId": { "example": "69b62cecf746a7138434a76d", "type": "string" },
+                  "checkIn": { "example": "2026-05-01", "type": "string" },
+                  "checkOut": { "example": "2026-05-04", "type": "string" },
+                  "reservationOption": { "example": "breakfast", "type": "string" },
+                  "cancellationPolicy": { "example": "free_cancellation", "type": "string" },
+                  "paymentOption": { "example": "pay_now", "type": "string" },
+                  "loyaltyPointsToRedeem": { "example": 100, "type": "number" },
+                  "specialRequests": { "example": "High floor preferred", "type": "string" },
+                  "guestDetails": {
+                    "type": "object",
+                    "properties": {
+                      "firstName": { "example": "Ahmed", "type": "string" },
+                      "lastName": { "example": "Magdy", "type": "string" },
+                      "email": { "example": "ahmed@example.com", "type": "string" },
+                      "phone": { "example": "+966500000000", "type": "string" },
+                      "nationality": { "example": "SA", "type": "string" }
+                    }
+                  }
+                },
+                "required": ["roomTypeId", "checkIn", "checkOut", "reservationOption", "cancellationPolicy", "paymentOption", "guestDetails"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": { "application/json": { "schema": { "type": "object", "properties": {} } } }
+          }
+        },
+        "security": [{ "bearer": [] }]
+      },
+      "get": {
+        "summary": "get all bookings",
+        "deprecated": false,
+        "description": "Admin only. List all bookings with filters.",
+        "tags": ["Bookings"],
+        "parameters": [
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "example": "confirmed",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "example": "1",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "example": "20",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "required": true,
+            "example": "ar",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": { "application/json": { "schema": { "type": "object", "properties": {} } } }
+          }
+        },
+        "security": [{ "bearer": [] }]
+      }
+    },
+    "/api/v1/bookings/my": {
+      "get": {
+        "summary": "get my bookings",
+        "deprecated": false,
+        "description": "Client only. Returns paginated list of own bookings.",
+        "tags": ["Bookings"],
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "example": "1",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "example": "10",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "required": true,
+            "example": "ar",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": { "application/json": { "schema": { "type": "object", "properties": {} } } }
+          }
+        },
+        "security": [{ "bearer": [] }]
+      }
+    },
+    "/api/v1/bookings/manual": {
+      "post": {
+        "summary": "create manual booking",
+        "deprecated": false,
+        "description": "Staff/Admin only. Walk-in or phone reservation. No payment required.",
+        "tags": ["Bookings"],
+        "parameters": [
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "required": true,
+            "example": "ar",
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "roomTypeId": { "example": "69b62cecf746a7138434a76d", "type": "string" },
+                  "checkIn": { "example": "2026-05-01", "type": "string" },
+                  "checkOut": { "example": "2026-05-04", "type": "string" },
+                  "reservationOption": { "example": "room_only", "type": "string" },
+                  "cancellationPolicy": { "example": "non_refundable", "type": "string" },
+                  "paymentOption": { "example": "pay_at_hotel", "type": "string" },
+                  "specialRequests": { "example": "Late check-in at 2am", "type": "string" },
+                  "clientId": { "example": "69a7a1025a74f09ceecbac32", "description": "Optional - link to existing user", "type": "string" },
+                  "guestDetails": {
+                    "type": "object",
+                    "properties": {
+                      "firstName": { "example": "Ahmed", "type": "string" },
+                      "lastName": { "example": "Magdy", "type": "string" },
+                      "email": { "example": "ahmed@example.com", "type": "string" },
+                      "phone": { "example": "+966500000000", "type": "string" },
+                      "nationality": { "example": "SA", "type": "string" }
+                    }
+                  }
+                },
+                "required": ["roomTypeId", "checkIn", "checkOut", "reservationOption", "cancellationPolicy", "paymentOption", "guestDetails"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": { "application/json": { "schema": { "type": "object", "properties": {} } } }
+          }
+        },
+        "security": [{ "bearer": [] }]
+      }
+    },
+    "/api/v1/bookings/{bookingId}": {
+      "get": {
+        "summary": "get booking by ID",
+        "deprecated": false,
+        "description": "Client can only view their own booking. Admin/Staff can view any.",
+        "tags": ["Bookings"],
+        "parameters": [
+          {
+            "name": "bookingId",
+            "in": "path",
+            "required": true,
+            "example": "69b62cecf746a7138434a76d",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "required": true,
+            "example": "ar",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": { "application/json": { "schema": { "type": "object", "properties": {} } } }
+          }
+        },
+        "security": [{ "bearer": [] }]
+      }
+    },
+    "/api/v1/bookings/{bookingId}/cancel": {
+      "patch": {
+        "summary": "cancel booking",
+        "deprecated": false,
+        "description": "Client can cancel their own booking within the allowed window.",
+        "tags": ["Bookings"],
+        "parameters": [
+          {
+            "name": "bookingId",
+            "in": "path",
+            "required": true,
+            "example": "69b62cecf746a7138434a76d",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "required": true,
+            "example": "ar",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": { "application/json": { "schema": { "type": "object", "properties": {} } } }
+          }
+        },
+        "security": [{ "bearer": [] }]
+      }
+    },
+    "/api/v1/bookings/{bookingId}/status": {
+      "patch": {
+        "summary": "update booking status",
+        "deprecated": false,
+        "description": "Staff/Admin only. Move booking through status machine: confirmed → checked_in → checked_out, or no_show.",
+        "tags": ["Bookings"],
+        "parameters": [
+          {
+            "name": "bookingId",
+            "in": "path",
+            "required": true,
+            "example": "69b62cecf746a7138434a76d",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "required": true,
+            "example": "ar",
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "status": {
+                    "description": "enums: confirmed | checked_in | checked_out | no_show",
+                    "example": "checked_in",
+                    "type": "string"
+                  }
+                },
+                "required": ["status"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": { "application/json": { "schema": { "type": "object", "properties": {} } } }
+          }
+        },
+        "security": [{ "bearer": [] }]
+      }
+    },
+    "/api/v1/payments/initiate": {
+      "post": {
+        "summary": "initiate payment",
+        "deprecated": false,
+        "description": "Client only. Initiates payment for a pending booking. Returns a checkout URL.",
+        "tags": ["Payments"],
+        "parameters": [
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "required": true,
+            "example": "ar",
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "bookingId": { "example": "69b62cecf746a7138434a76d", "type": "string" },
+                  "successUrl": { "example": "https://charlihotel.com/booking/success", "type": "string" },
+                  "failureUrl": { "example": "https://charlihotel.com/booking/failed", "type": "string" }
+                },
+                "required": ["bookingId", "successUrl", "failureUrl"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": { "application/json": { "schema": { "type": "object", "properties": {} } } }
+          }
+        },
+        "security": [{ "bearer": [] }]
+      }
+    },
+    "/api/v1/payments/webhook": {
+      "post": {
+        "summary": "payment webhook",
+        "deprecated": false,
+        "description": "Public. Called by the payment gateway (Moyasar) after a payment attempt.",
+        "tags": ["Payments"],
+        "parameters": [],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "type": { "example": "payment_paid", "type": "string" },
+                  "data": { "type": "object", "properties": {} }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": { "application/json": { "schema": { "type": "object", "properties": {} } } }
+          }
+        },
+        "security": []
+      }
+    },
+    "/api/v1/payments/{bookingId}": {
+      "get": {
+        "summary": "get payment by booking",
+        "deprecated": false,
+        "description": "Client can view payment for their own booking. Admin can view any.",
+        "tags": ["Payments"],
+        "parameters": [
+          {
+            "name": "bookingId",
+            "in": "path",
+            "required": true,
+            "example": "69b62cecf746a7138434a76d",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "required": true,
+            "example": "ar",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": { "application/json": { "schema": { "type": "object", "properties": {} } } }
+          }
+        },
+        "security": [{ "bearer": [] }]
+      }
+    },
+    "/api/v1/payments": {
+      "get": {
+        "summary": "get all payments",
+        "deprecated": false,
+        "description": "Admin only.",
+        "tags": ["Payments"],
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "example": "1",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "example": "20",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "required": true,
+            "example": "ar",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": { "application/json": { "schema": { "type": "object", "properties": {} } } }
+          }
+        },
+        "security": [{ "bearer": [] }]
+      }
+    },
+    "/api/v1/payments/{paymentId}/refund": {
+      "post": {
+        "summary": "refund payment",
+        "deprecated": false,
+        "description": "Admin only. Triggers a full refund via the payment gateway.",
+        "tags": ["Payments"],
+        "parameters": [
+          {
+            "name": "paymentId",
+            "in": "path",
+            "required": true,
+            "example": "69b62cecf746a7138434a76d",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "required": true,
+            "example": "ar",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": { "application/json": { "schema": { "type": "object", "properties": {} } } }
+          }
+        },
+        "security": [{ "bearer": [] }]
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearer": {
+        "type": "http",
+        "scheme": "bearer"
+      }
+    }
+  }
+}

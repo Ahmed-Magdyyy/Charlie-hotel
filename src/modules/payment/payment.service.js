@@ -1,0 +1,341 @@
+import mongoose from "mongoose";
+import { ApiError } from "../../shared/utils/ApiError.js";
+import { t } from "../../shared/i18n/index.js";
+import { getGateway } from "./gateways/gateway.factory.js";
+import {
+  createPayment,
+  findPaymentById,
+  findPaymentByGatewayId,
+  findPaymentsByBooking,
+  findPayments,
+  countPayments,
+  updatePaymentById,
+} from "./payment.repository.js";
+import { findBookingById, updateBookingById } from "../booking/booking.repository.js";
+import { bookingStatus, bookingPaymentStatus } from "../../shared/constants/enums.js";
+import { buildPagination } from "../../shared/utils/apiFeatures.js";
+import { PaymentModel } from "./payment.model.js";
+
+// ─── Initiate Payment ──────────────────────────────────────
+
+export async function initiatePaymentService(body, user, lang) {
+  const { bookingId } = body;
+
+  const booking = await findBookingById(bookingId, { lean: true });
+  if (!booking) {
+    throw new ApiError(t("booking.BOOKING_NOT_FOUND", lang), 404);
+  }
+
+  // Only pending pay_now bookings can initiate payment
+  if (booking.status !== bookingStatus.PENDING) {
+    throw new ApiError(t("payment.BOOKING_NOT_PENDING", lang), 400);
+  }
+
+  // Check ownership
+  if (booking.client?.toString() !== user._id.toString()) {
+    throw new ApiError(t("common.NO_PERMISSION", lang), 403);
+  }
+
+  const gateway = getGateway();
+
+  const result = await gateway.initiate({
+    amount: booking.priceBreakdown.grandTotal,
+    currency: "SAR",
+    description: `Charlie Hotel — Booking ${booking.bookingNumber}`,
+    bookingId: booking._id.toString(),
+  });
+
+  // Create payment record
+  const payment = await createPayment({
+    booking: booking._id,
+    amount: booking.priceBreakdown.grandTotal,
+    currency: "SAR",
+    method: "credit_card", // Will be updated after payment completes
+    gateway: gateway.name,
+    gatewayPaymentId: result.gatewayPaymentId,
+    gatewayResponse: result.raw,
+    status: "initiated",
+  });
+
+  // Link payment to booking
+  await updateBookingById(booking._id, { paymentId: payment._id });
+
+  return {
+    paymentId: payment._id,
+    gatewayPaymentId: result.gatewayPaymentId,
+    checkoutUrl: result.checkoutUrl,
+  };
+}
+
+// ─── Webhook Handler ───────────────────────────────────────
+
+export async function handleWebhookService(reqBody, reqHeaders, rawBody) {
+  const gateway = getGateway();
+  const result = gateway.parseWebhook(reqBody, reqHeaders, rawBody);
+
+  // Find the payment by gateway ID
+  const payment = await findPaymentByGatewayId(result.gatewayPaymentId);
+  if (!payment) {
+    console.warn(`[Payment Webhook] Unknown gatewayPaymentId: ${result.gatewayPaymentId}`);
+    return { acknowledged: true };
+  }
+
+  // Already processed (idempotency guard)
+  if (payment.status === "paid" || payment.status === "refunded") {
+    return { acknowledged: true };
+  }
+
+  const session = await mongoose.startSession();
+  session.startTransaction();
+
+  try {
+    if (result.paid) {
+      // Atomically update payment status (optimistic lock: only if still initiated)
+      const updated = await PaymentModel.findOneAndUpdate(
+        { _id: payment._id, status: "initiated" },
+        {
+          status: "paid",
+          method: result.method,
+          gatewayResponse: result.raw,
+          paidAt: new Date(),
+        },
+        { new: true, session },
+      );
+
+      if (!updated) {
+        // Another webhook already processed this — abort safely
+        await session.abortTransaction();
+        return { acknowledged: true };
+      }
+
+      // Update booking
+      const booking = await findBookingById(payment.booking);
+      if (!booking) {
+        await session.commitTransaction();
+        return { acknowledged: true };
+      }
+
+      if (booking.status === bookingStatus.PENDING) {
+        // Happy path: booking still pending, confirm it
+        booking.status = bookingStatus.CONFIRMED;
+        booking.paymentStatus = bookingPaymentStatus.PAID;
+        booking.statusHistory.push({
+          status: bookingStatus.CONFIRMED,
+          changedBy: null,
+          note: `Payment confirmed via ${gateway.name}`,
+        });
+        await booking.save({ session });
+      } else if (booking.status === bookingStatus.EXPIRED) {
+        // Edge case: booking expired while user was paying
+        // Mark payment as paid, then auto-refund via gateway
+        await booking.save({ session });
+        await session.commitTransaction();
+
+        // Refund outside the transaction (external API call)
+        console.warn(
+          `[Payment Webhook] Booking ${booking.bookingNumber} expired but payment succeeded. Initiating auto-refund.`,
+        );
+        try {
+          const refundResult = await gateway.refund(result.gatewayPaymentId, payment.amount);
+          await PaymentModel.findByIdAndUpdate(payment._id, {
+            status: "refunded",
+            refundId: refundResult.refundId,
+            refundedAt: new Date(),
+            gatewayResponse: refundResult.raw,
+          });
+          console.log(
+            `[Payment Webhook] Auto-refund completed for booking ${booking.bookingNumber}`,
+          );
+        } catch (refundErr) {
+          console.error(
+            `[Payment Webhook] Auto-refund FAILED for booking ${booking.bookingNumber}:`,
+            refundErr.message,
+          );
+          // Manual intervention needed — payment is marked as paid but booking is expired
+        }
+        return { acknowledged: true };
+      } else {
+        // Booking in some other terminal state (cancelled, etc.) — same: refund
+        await session.commitTransaction();
+        console.warn(
+          `[Payment Webhook] Booking ${booking.bookingNumber} in status "${booking.status}" but payment succeeded. Initiating auto-refund.`,
+        );
+        try {
+          const refundResult = await gateway.refund(result.gatewayPaymentId, payment.amount);
+          await PaymentModel.findByIdAndUpdate(payment._id, {
+            status: "refunded",
+            refundId: refundResult.refundId,
+            refundedAt: new Date(),
+            gatewayResponse: refundResult.raw,
+          });
+        } catch (refundErr) {
+          console.error(
+            `[Payment Webhook] Auto-refund FAILED for booking ${booking.bookingNumber}:`,
+            refundErr.message,
+          );
+        }
+        return { acknowledged: true };
+      }
+    } else {
+      // Payment failed
+      await PaymentModel.findOneAndUpdate(
+        { _id: payment._id, status: "initiated" },
+        { status: "failed", gatewayResponse: result.raw },
+        { session },
+      );
+
+      const booking = await findBookingById(payment.booking);
+      if (booking) {
+        booking.paymentStatus = bookingPaymentStatus.FAILED;
+        await booking.save({ session });
+      }
+    }
+
+    await session.commitTransaction();
+    return { acknowledged: true };
+  } catch (err) {
+    if (session.inTransaction()) await session.abortTransaction();
+    throw err;
+  } finally {
+    session.endSession();
+  }
+}
+
+// ─── Get Payment Status ────────────────────────────────────
+
+export async function getPaymentByBookingService(bookingId, user, lang) {
+  const booking = await findBookingById(bookingId, { lean: true });
+  if (!booking) {
+    throw new ApiError(t("booking.BOOKING_NOT_FOUND", lang), 404);
+  }
+
+  // Ownership or staff/admin check
+  const isOwner = booking.client?.toString() === user._id.toString();
+  const isStaffOrAdmin = user.role === "admin" || user.role === "superAdmin" || user.role === "staff";
+  if (!isOwner && !isStaffOrAdmin) {
+    throw new ApiError(t("common.NO_PERMISSION", lang), 403);
+  }
+
+  const payments = await findPaymentsByBooking(bookingId);
+  return payments;
+}
+
+// ─── Refund ────────────────────────────────────────────────
+
+export async function refundPaymentService(paymentId, user, lang) {
+  const payment = await findPaymentById(paymentId);
+  if (!payment) {
+    throw new ApiError(t("payment.PAYMENT_NOT_FOUND", lang), 404);
+  }
+
+  if (payment.status !== "paid") {
+    throw new ApiError(t("payment.CANNOT_REFUND", lang), 400);
+  }
+
+  // Only online payments can be refunded through gateway
+  if (payment.gateway === "offline") {
+    throw new ApiError(t("payment.OFFLINE_NO_REFUND", lang), 400);
+  }
+
+  const gateway = getGateway();
+  const result = await gateway.refund(payment.gatewayPaymentId, payment.amount);
+
+  if (result.success) {
+    await updatePaymentById(payment._id, {
+      status: "refunded",
+      refundId: result.refundId,
+      gatewayResponse: result.raw,
+      refundedAt: new Date(),
+    });
+
+    // Update booking payment status
+    const booking = await findBookingById(payment.booking);
+    if (booking) {
+      booking.paymentStatus = bookingPaymentStatus.REFUNDED;
+      booking.statusHistory.push({
+        status: booking.status,
+        changedBy: user._id,
+        note: "Payment refunded",
+      });
+      await booking.save();
+    }
+  }
+
+  return result;
+}
+
+// ─── Mark pay_at_hotel as Paid (Staff/Admin) ──────────────
+
+export async function markPayAtHotelPaidService(bookingId, user, lang) {
+  const booking = await findBookingById(bookingId);
+  if (!booking) {
+    throw new ApiError(t("booking.BOOKING_NOT_FOUND", lang), 404);
+  }
+
+  // Must be a pay_at_hotel booking
+  if (booking.paymentOption?.type !== "pay_at_hotel") {
+    throw new ApiError(t("payment.NOT_PAY_AT_HOTEL", lang), 400);
+  }
+
+  // Must not already be paid
+  if (booking.paymentStatus === bookingPaymentStatus.PAID) {
+    throw new ApiError(t("payment.ALREADY_PAID", lang), 400);
+  }
+
+  // Must be in a bookable state (confirmed or checked_in)
+  if (
+    booking.status !== bookingStatus.CONFIRMED &&
+    booking.status !== bookingStatus.CHECKED_IN
+  ) {
+    throw new ApiError(t("payment.BOOKING_NOT_ACTIVE", lang), 400);
+  }
+
+  // Create an offline payment record
+  const payment = await createPayment({
+    booking: booking._id,
+    amount: booking.priceBreakdown.grandTotal,
+    currency: "SAR",
+    method: "pay_at_hotel",
+    gateway: "offline",
+    status: "paid",
+    paidAt: new Date(),
+  });
+
+  // Update booking
+  booking.paymentId = payment._id;
+  booking.paymentStatus = bookingPaymentStatus.PAID;
+  booking.statusHistory.push({
+    status: booking.status,
+    changedBy: user._id,
+    note: "Payment collected at hotel",
+  });
+  await booking.save();
+
+  return { booking, payment };
+}
+
+// ─── List All Payments (Admin) ─────────────────────────────
+
+export async function getAllPaymentsService(queryParams, lang) {
+  const { page, limit, status } = queryParams;
+
+  const filter = {};
+  if (status) filter.status = status;
+
+  const totalCount = await countPayments(filter);
+  const { pageNum, limitNum, skip } = buildPagination({ page, limit }, 20);
+
+  const payments = await findPayments(filter, {
+    skip,
+    limit: limitNum,
+    populate: { path: "booking", select: "bookingNumber client" },
+    lean: true,
+  });
+
+  return {
+    totalPages: Math.ceil(totalCount / limitNum) || 1,
+    page: pageNum,
+    results: payments.length,
+    payments,
+  };
+}

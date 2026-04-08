@@ -17,6 +17,8 @@ import {
 import { dbConnection } from "../config/database.js";
 import { mountRoutes } from "./routes.js";
 import { i18nMiddleware } from "../shared/middlewares/i18nMiddleware.js";
+import { startBookingExpiryJob } from "../shared/jobs/bookingExpiryJob.js";
+import { startPaymentReconciliationJob } from "../shared/jobs/paymentReconciliationJob.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -25,7 +27,14 @@ config({ path: path.resolve(__dirname, "../../.env") });
 // middlewares
 app.set("trust proxy", 1);
 app.use(express.urlencoded({ extended: false }));
-app.use(express.json());
+app.use(express.json({
+  verify: (req, _res, buf) => {
+    // Preserve raw body for webhook signature verification
+    if (req.originalUrl?.includes("/webhook")) {
+      req.rawBody = buf.toString("utf8");
+    }
+  },
+}));
 app.use(express.static(path.join(__dirname, "uploads")));
 app.use(cookieParser());
 app.use(compression());
@@ -43,6 +52,10 @@ dbConnection();
 
 // Mount Routes
 mountRoutes(app);
+
+// Start background jobs
+startBookingExpiryJob();
+startPaymentReconciliationJob();
 
 app.get("/", (req, res) => {
   res.send("Charlie Hotel API is running.");

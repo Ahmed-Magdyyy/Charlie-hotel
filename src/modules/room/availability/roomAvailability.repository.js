@@ -96,6 +96,60 @@ export async function incrementBookedRooms(roomTypeId, date, totalRoomCount, ses
 }
 
 /**
+ * Batch increment bookedRooms for multiple dates in one round-trip.
+ * First ensures records exist (upserts missing ones), then increments all atomically.
+ * Returns false if any night is fully booked/blocked — caller must abort.
+ */
+export async function incrementBookedRoomsBatch(roomTypeId, dates, totalRoomCount, session) {
+  if (totalRoomCount <= 0) return false;
+
+  // Step 1: Upsert all dates in one bulkWrite (creates missing records with 0 booked)
+  const upsertOps = dates.map((date) => ({
+    updateOne: {
+      filter: { roomType: roomTypeId, date },
+      update: { $setOnInsert: { bookedRooms: 0, blockedRooms: 0 } },
+      upsert: true,
+    },
+  }));
+  await RoomAvailabilityModel.bulkWrite(upsertOps, { session });
+
+  // Step 2: Increment all dates that have availability in one bulkWrite
+  const incOps = dates.map((date) => ({
+    updateOne: {
+      filter: {
+        roomType: roomTypeId,
+        date,
+        $expr: {
+          $gt: [
+            { $subtract: [totalRoomCount, { $add: ["$bookedRooms", "$blockedRooms"] }] },
+            0,
+          ],
+        },
+      },
+      update: { $inc: { bookedRooms: 1 } },
+    },
+  }));
+  const result = await RoomAvailabilityModel.bulkWrite(incOps, { session });
+
+  // If any night wasn't updated, it means that night is fully booked/blocked
+  return result.modifiedCount === dates.length;
+}
+
+/**
+ * Batch decrement bookedRooms for multiple dates in one round-trip.
+ */
+export async function decrementBookedRoomsBatch(roomTypeId, dates, session) {
+  const ops = dates.map((date) => ({
+    updateOne: {
+      filter: { roomType: roomTypeId, date, bookedRooms: { $gt: 0 } },
+      update: { $inc: { bookedRooms: -1 } },
+    },
+  }));
+  if (ops.length === 0) return;
+  await RoomAvailabilityModel.bulkWrite(ops, { session });
+}
+
+/**
  * Atomically decrement bookedRooms for a single date (used when cancelling a booking).
  */
 export async function decrementBookedRooms(roomTypeId, date, session) {

@@ -254,3 +254,34 @@ export const paymentOptionTypes = Object.freeze({
   PAY_NOW: "pay_now",
   PAY_AT_HOTEL: "pay_at_hotel",
 });
+
+// ─── Booking ───────────────────────────────────────────────
+
+export const bookingStatus = Object.freeze({
+  PENDING: "pending",
+  CONFIRMED: "confirmed",
+  CHECKED_IN: "checked_in",
+  CHECKED_OUT: "checked_out",
+  CANCELLED: "cancelled",
+  EXPIRED: "expired",
+  NO_SHOW: "no_show",
+});
+
+export const bookingPaymentStatus = Object.freeze({
+  PENDING: "pending",
+  PAID: "paid",
+  FAILED: "failed",
+  REFUNDED: "refunded",
+});
+
+// Valid status transitions: from → [allowed targets]
+export const bookingStatusTransitions = Object.freeze({
+  pending: ["confirmed", "cancelled", "expired"],
+  confirmed: ["checked_in", "cancelled", "no_show"],
+  checked_in: ["checked_out"],
+  // Terminal states — no transitions out
+  checked_out: [],
+  cancelled: [],
+  expired: [],
+  no_show: [],
+});

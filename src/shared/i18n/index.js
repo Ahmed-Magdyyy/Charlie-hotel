@@ -3,8 +3,11 @@ import common from "./common.js";
 import auth from "./modules/auth.js";
 import user from "./modules/user.js";
 import room from "./modules/room.js";
+import booking from "./modules/booking.js";
+import payment from "./modules/payment.js";
+import loyalty from "./modules/loyalty.js";
 
-const messages = { common, auth, user, room };
+const messages = { common, auth, user, room, booking, payment, loyalty };
 
 /**
  * Translate a message key to the given language.
