@@ -69,13 +69,16 @@ export async function initiatePaymentService(body, user, lang) {
 
 // ─── Webhook Handler ───────────────────────────────────────
 
-export async function handleWebhookService(reqBody, reqHeaders, rawBody) {
+export async function handleWebhookService(reqBody) {
   const gateway = getGateway();
-  let result = gateway.parseWebhook(reqBody, reqHeaders, rawBody);
+  let result = gateway.parseWebhook(reqBody);
 
-  // Find the payment — try by gateway ID first, then by booking ID from metadata
-  // (Invoice API: we store the invoice ID, but webhook sends the payment ID)
+  // Find the payment — try by gateway ID, then invoice ID, then booking ID
+  // (We store invoice ID, but webhook sends payment ID)
   let payment = await findPaymentByGatewayId(result.gatewayPaymentId);
+  if (!payment && result.invoiceId) {
+    payment = await findPaymentByGatewayId(result.invoiceId);
+  }
   if (!payment && result.bookingId) {
     const payments = await findPaymentsByBooking(result.bookingId);
     payment = payments.find((p) => p.status === "initiated") || payments[0];

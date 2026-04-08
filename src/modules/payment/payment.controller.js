@@ -21,7 +21,7 @@ export const initiatePayment = asyncHandler(async (req, res) => {
 
 // POST /api/v1/payments/webhook
 export const paymentWebhook = asyncHandler(async (req, res) => {
-  const result = await handleWebhookService(req.body, req.headers, req.rawBody);
+  const result = await handleWebhookService(req.body);
   res.status(200).json(result);
 });
 

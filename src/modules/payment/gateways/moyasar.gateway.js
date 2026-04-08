@@ -89,6 +89,8 @@ const moyasarGateway = {
       return {
         paid: data.status === "paid",
         gatewayPaymentId: data.id,
+        // The actual Moyasar payment ID (needed for refunds — different from invoice ID)
+        moyasarPaymentId: payment?.id || null,
         method: payment ? mapMoyasarMethod(payment.source?.type) : "credit_card",
         raw: data,
       };
@@ -98,6 +100,7 @@ const moyasarGateway = {
       return {
         paid: data.status === "paid",
         gatewayPaymentId: data.id,
+        moyasarPaymentId: data.id,
         method: mapMoyasarMethod(data.source?.type),
         raw: data,
       };
@@ -113,20 +116,26 @@ const moyasarGateway = {
    * @returns {VerifyResult}
    * @throws {Error} if signature verification fails
    */
-  parseWebhook(reqBody, reqHeaders, rawBody) {
-    // Verify webhook secret token
-    // Moyasar sends the secret token via Basic Auth header: "Basic base64(secret_token:)"
-    const webhookSecret = process.env.MOYASAR_WEBHOOK_SECRET;
-
+  parseWebhook(reqBody) {
     // Moyasar doesn't send auth headers on webhooks.
-    // Instead of trusting the webhook body, we extract the payment ID
+    // Instead of trusting the webhook body, we extract the payment/invoice ID
     // and verify it by calling Moyasar's API directly.
     const data = reqBody;
 
+    // Moyasar webhook may nest the payment data or send it flat
+    // Also check if this is a payment event containing an invoice reference
+    const bookingId =
+      data.metadata?.bookingId ||
+      data.invoice?.metadata?.bookingId ||
+      null;
+
+    console.log("[Moyasar Webhook] Body keys:", Object.keys(data), "id:", data.id, "bookingId:", bookingId);
+
     return {
       gatewayPaymentId: data.id,
-      bookingId: data.metadata?.bookingId || null,
-      needsVerification: true, // signal to service layer to call verify()
+      invoiceId: data.invoice_id || data.invoice?.id || null,
+      bookingId,
+      needsVerification: true,
       raw: data,
     };
   },
@@ -138,7 +147,18 @@ const moyasarGateway = {
    * @returns {Promise<RefundResult>}
    */
   async refund(gatewayPaymentId, amount) {
-    const data = await moyasarFetch(`/payments/${gatewayPaymentId}/refund`, {
+    // gatewayPaymentId might be an invoice ID — resolve the actual payment ID
+    let paymentId = gatewayPaymentId;
+    try {
+      const invoice = await moyasarFetch(`/invoices/${gatewayPaymentId}`);
+      if (invoice.payments?.[0]?.id) {
+        paymentId = invoice.payments[0].id;
+      }
+    } catch {
+      // Not an invoice — assume it's already a payment ID
+    }
+
+    const data = await moyasarFetch(`/payments/${paymentId}/refund`, {
       method: "POST",
       body: JSON.stringify({
         amount: Math.round(amount * 100),
