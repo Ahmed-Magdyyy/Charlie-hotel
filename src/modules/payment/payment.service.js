@@ -195,16 +195,20 @@ export async function handleWebhookService(reqBody) {
       }
     } else {
       // Payment failed
-      await PaymentModel.findOneAndUpdate(
+      const failedUpdate = await PaymentModel.findOneAndUpdate(
         { _id: payment._id, status: "initiated" },
         { status: "failed", gatewayResponse: result.raw },
         { session },
       );
 
-      const booking = await findBookingById(payment.booking);
-      if (booking) {
-        booking.paymentStatus = bookingPaymentStatus.FAILED;
-        await booking.save({ session });
+      // Only update booking if the payment was actually changed (still was "initiated")
+      // This prevents a late-arriving webhook from overwriting a successful payment
+      if (failedUpdate) {
+        const booking = await findBookingById(payment.booking);
+        if (booking) {
+          booking.paymentStatus = bookingPaymentStatus.FAILED;
+          await booking.save({ session });
+        }
       }
     }
 

@@ -235,7 +235,7 @@ const alinmapayGateway = {
     const config = getConfig();
     const baseUrl = getBaseUrl();
 
-    // Build inquiry request
+    // Build inquiry request (paymentType "10" = Inquiry in V3.7)
     const hash = generateRequestHash(
       gatewayPaymentId,
       config.terminalId,
@@ -248,9 +248,9 @@ const alinmapayGateway = {
     const payload = {
       terminalId: config.terminalId,
       password: config.password,
-      action: 10, // Inquiry
-      paymentId: gatewayPaymentId,
-      hashDigest: hash,
+      paymentType: "10", // Inquiry
+      referenceId: gatewayPaymentId,
+      signature: hash,
     };
 
     const res = await fetch(baseUrl, {
@@ -259,16 +259,23 @@ const alinmapayGateway = {
       body: JSON.stringify(payload),
     });
 
-    const data = await res.json();
+    const responseText = await res.text();
+    let data;
+    try {
+      data = JSON.parse(responseText);
+    } catch {
+      console.error("[AlinmaPay] Verify returned non-JSON:", responseText.substring(0, 150));
+      return { paid: false, gatewayPaymentId, raw: responseText };
+    }
 
     const isPaid =
       data.responseCode === "000" ||
       data.responseCode === "001" ||
-      data.status === "SUCCESS";
+      data.result === "SUCCESS";
 
     return {
       paid: isPaid,
-      gatewayPaymentId: data.paymentId || gatewayPaymentId,
+      gatewayPaymentId: data.paymentId || data.transactionId || gatewayPaymentId,
       method: mapAlinmaMethod(
         data.cardDetails?.cardType || data.instrumentType,
       ),
