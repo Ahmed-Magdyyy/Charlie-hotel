@@ -13,7 +13,8 @@ import { t } from "../../shared/i18n/index.js";
 
 // POST /api/v1/bookings/calculate
 export const calculateBooking = asyncHandler(async (req, res) => {
-  const data = await calculateBookingService(req.body, req.user || null, req.lang);
+  const currency = req.query.currency || "SAR";
+  const data = await calculateBookingService(req.body, req.user || null, req.lang, currency);
   res.status(200).json({ status: "success", data });
 });
 
@@ -51,10 +52,12 @@ export const getAllBookings = asyncHandler(async (req, res) => {
 
 // GET /api/v1/bookings/:bookingId
 export const getBooking = asyncHandler(async (req, res) => {
+  const currency = req.query.currency || "SAR";
   const booking = await getBookingByIdService(
     req.params.bookingId,
     req.user,
     req.lang,
+    currency,
   );
   res.status(200).json({ status: "success", data: booking });
 });

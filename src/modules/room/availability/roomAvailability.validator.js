@@ -1,5 +1,6 @@
 import { param, body, query } from "express-validator";
 import { validatorMiddleware } from "../../../shared/middlewares/validatorMiddleware.js";
+import { supportedCurrencies } from "../../../shared/constants/enums.js";
 
 export const getAvailabilityValidator = [
   param("roomTypeId").isMongoId().withMessage("Invalid room type ID"),
@@ -49,5 +50,10 @@ export const searchAvailabilityValidator = [
     .optional()
     .isInt({ min: 1 })
     .withMessage("guests must be a positive integer"),
+  query("currency")
+    .optional()
+    .toUpperCase()
+    .isIn(supportedCurrencies)
+    .withMessage(`currency must be one of: ${supportedCurrencies.join(", ")}`),
   validatorMiddleware,
 ];

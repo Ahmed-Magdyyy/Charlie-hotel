@@ -2,6 +2,7 @@ import mongoose from "mongoose";
 import { ApiError } from "../../shared/utils/ApiError.js";
 import { t } from "../../shared/i18n/index.js";
 import { calculatePriceBreakdown } from "../../shared/services/pricingEngine.js";
+import { convertBreakdown } from "../../shared/services/currencyService.js";
 import {
   incrementBookedRoomsBatch,
   decrementBookedRoomsBatch,
@@ -30,12 +31,13 @@ import {
   earnPointsService,
 } from "../loyalty/loyalty.service.js";
 import { initiatePaymentService } from "../payment/payment.service.js";
+import { resolveTier, updateUserSpentAndTier } from "../tier/tier.service.js";
 
 const PENDING_EXPIRY_MINUTES = 15;
 
 // ─── Calculate (Preview) ───────────────────────────────────
 
-export async function calculateBookingService(body, user, lang) {
+export async function calculateBookingService(body, user, lang, currency = "SAR") {
   const { loyaltyPointsToRedeem = 0 } = body;
 
   // Validate loyalty points if user is authenticated and redeeming
@@ -61,8 +63,17 @@ export async function calculateBookingService(body, user, lang) {
     }
   }
 
-  const breakdown = await calculatePriceBreakdown(body, lang);
-  return breakdown;
+  // Resolve user tier for discount
+  let tierInfo = null;
+  if (user) {
+    const freshUser = await UserModel.findById(user._id).select("totalSpent").lean();
+    tierInfo = await resolveTier(freshUser?.totalSpent || 0);
+  }
+
+  const breakdown = await calculatePriceBreakdown(body, lang, tierInfo);
+
+  // Convert to requested currency (default SAR = no-op)
+  return convertBreakdown(breakdown, currency);
 }
 
 // ─── Create Booking (Client) ───────────────────────────────
@@ -104,7 +115,11 @@ export async function createBookingService(body, user, lang) {
     }
   }
 
-  // 2. Calculate price (also validates guests vs maxGuests) + generate booking number in parallel
+  // 2. Resolve user tier for discount
+  const userDoc = await UserModel.findById(user._id).select("totalSpent").lean();
+  const tierInfo = await resolveTier(userDoc?.totalSpent || 0);
+
+  // 3. Calculate price (also validates guests vs maxGuests) + generate booking number in parallel
   const [breakdown, bookingNumber] = await Promise.all([
     calculatePriceBreakdown(
       {
@@ -118,6 +133,7 @@ export async function createBookingService(body, user, lang) {
         loyaltyPointsToRedeem,
       },
       lang,
+      tierInfo,
     ),
     generateBookingNumber(),
   ]);
@@ -182,9 +198,16 @@ export async function createBookingService(body, user, lang) {
           subtotal: breakdown.subtotal,
           loyaltyDiscount: breakdown.loyaltyDiscount,
           taxableAmount: breakdown.taxableAmount,
+          munTaxRate: breakdown.munTaxRate,
+          munTax: breakdown.munTax,
           vatRate: breakdown.vatRate,
+          vatAmount: breakdown.vatAmount,
           taxes: breakdown.taxes,
           grandTotal: breakdown.grandTotal,
+          tierName: breakdown.tierName,
+          tierDiscountRate: breakdown.tierDiscountRate,
+          tierDiscount: breakdown.tierDiscount,
+          finalTotal: breakdown.finalTotal,
         },
         status: initialStatus,
         paymentStatus: initialPaymentStatus,
@@ -322,9 +345,16 @@ export async function createManualBookingService(body, staffUser, lang) {
           subtotal: breakdown.subtotal,
           loyaltyDiscount: 0,
           taxableAmount: breakdown.taxableAmount,
+          munTaxRate: breakdown.munTaxRate,
+          munTax: breakdown.munTax,
           vatRate: breakdown.vatRate,
+          vatAmount: breakdown.vatAmount,
           taxes: breakdown.taxes,
           grandTotal: breakdown.grandTotal,
+          tierName: breakdown.tierName,
+          tierDiscountRate: breakdown.tierDiscountRate,
+          tierDiscount: breakdown.tierDiscount,
+          finalTotal: breakdown.finalTotal,
         },
         status: initialStatus,
         paymentStatus: initialPaymentStatus,
@@ -353,7 +383,7 @@ export async function createManualBookingService(body, staffUser, lang) {
 
 // ─── Get Booking By ID ─────────────────────────────────────
 
-export async function getBookingByIdService(bookingId, user, lang) {
+export async function getBookingByIdService(bookingId, user, lang, currency = "SAR") {
   const booking = await findBookingById(bookingId, {
     populate: [
       { path: "roomType", select: "name images" },
@@ -379,13 +409,21 @@ export async function getBookingByIdService(bookingId, user, lang) {
     throw new ApiError(t("common.NO_PERMISSION", lang), 403);
   }
 
+  // Convert priceBreakdown to requested currency
+  if (currency.toUpperCase() !== "SAR" && booking.priceBreakdown) {
+    booking.priceBreakdown = await convertBreakdown(
+      booking.priceBreakdown,
+      currency,
+    );
+  }
+
   return booking;
 }
 
 // ─── List My Bookings (Client) ─────────────────────────────
 
 export async function getMyBookingsService(user, queryParams, lang) {
-  const { page, limit } = queryParams;
+  const { page, limit, currency = "SAR" } = queryParams;
   const totalCount = await countBookingsByClient(user._id);
   const { pageNum, limitNum, skip } = buildPagination({ page, limit }, 10);
 
@@ -395,6 +433,18 @@ export async function getMyBookingsService(user, queryParams, lang) {
     populate: { path: "roomType", select: "name images" },
     lean: true,
   });
+
+  // Convert prices if non-SAR currency requested
+  if (currency.toUpperCase() !== "SAR") {
+    for (const booking of bookings) {
+      if (booking.priceBreakdown) {
+        booking.priceBreakdown = await convertBreakdown(
+          booking.priceBreakdown,
+          currency,
+        );
+      }
+    }
+  }
 
   return {
     totalPages: Math.ceil(totalCount / limitNum) || 1,
@@ -407,7 +457,7 @@ export async function getMyBookingsService(user, queryParams, lang) {
 // ─── List All Bookings (Admin/Staff) ───────────────────────
 
 export async function getAllBookingsService(queryParams, lang) {
-  const { page, limit, status, paymentStatus, roomTypeId, ...rest } =
+  const { page, limit, status, paymentStatus, roomTypeId, currency = "SAR", ...rest } =
     queryParams;
 
   const filter = {};
@@ -429,6 +479,18 @@ export async function getAllBookingsService(queryParams, lang) {
     ],
     lean: true,
   });
+
+  // Convert prices if non-SAR currency requested
+  if (currency.toUpperCase() !== "SAR") {
+    for (const booking of bookings) {
+      if (booking.priceBreakdown) {
+        booking.priceBreakdown = await convertBreakdown(
+          booking.priceBreakdown,
+          currency,
+        );
+      }
+    }
+  }
 
   return {
     totalPages: Math.ceil(totalCount / limitNum) || 1,
@@ -569,10 +631,18 @@ export async function updateBookingStatusService(bookingId, body, user, lang) {
     session.startTransaction();
 
     try {
+      // 1. Give loyalty points
       const pointsEarned = await earnPointsService(
         booking.client,
         booking._id,
-        booking.priceBreakdown.grandTotal,
+        booking.priceBreakdown.finalTotal, // Calculate points based on final total
+        session,
+      );
+
+      // 2. Update user spent and tier
+      await updateUserSpentAndTier(
+        booking.client,
+        booking.priceBreakdown.finalTotal, // Increment spent by final total
         session,
       );
 

@@ -11,33 +11,6 @@ export const accountStatus = Object.freeze({
   DELETED: "deleted",
 });
 
-export const authProviderEnum = Object.freeze({
-  SYSTEM: "SYSTEM",
-  GOOGLE: "GOOGLE",
-  APPLE: "APPLE",
-});
-
-export const orderStatusEnum = Object.freeze({
-  PENDING: "pending",
-  ACCEPTED: "accepted",
-  SHIPPED: "shipped",
-  DELIVERED: "delivered",
-  CANCELLED: "cancelled",
-  RETURNED: "returned",
-});
-
-export const paymentMethodEnum = Object.freeze({
-  COD: "cod",
-  CARD: "card",
-});
-
-export const paymentStatusEnum = Object.freeze({
-  PENDING: "pending",
-  PAID: "paid",
-  FAILED: "failed",
-  REFUNDED: "refunded",
-});
-
 // ─── Permission System ─────────────────────────────────────
 
 export const permissionActions = Object.freeze({
@@ -285,3 +258,19 @@ export const bookingStatusTransitions = Object.freeze({
   expired: [],
   no_show: [],
 });
+
+// ─── Supported Currencies ──────────────────────────────────
+
+export const supportedCurrencies = Object.freeze([
+  "SAR",
+  "EUR",
+  "USD",
+  "AED",
+  "EGP",
+  "GBP",
+]);
+
+// ─── Saudi Tax Rates ───────────────────────────────────────
+
+export const MUN_TAX_RATE = 0.025; // 2.5% Municipal tax
+export const VAT_RATE = 0.15; // 15% VAT (applied after mun tax)

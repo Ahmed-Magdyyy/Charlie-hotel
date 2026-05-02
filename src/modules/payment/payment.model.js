@@ -23,7 +23,7 @@ const paymentSchema = new mongoose.Schema(
     },
     gateway: {
       type: String,
-      enum: ["moyasar", "tap", "hyperpay", "offline"],
+      enum: ["moyasar", "alinmapay", "tap", "hyperpay", "offline"],
       required: true,
     },
     gatewayPaymentId: {

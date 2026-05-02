@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { protect, requirePermission } from "../auth/auth.middleware.js";
+import { handleWebhookService } from "./payment.service.js";
 import {
   initiatePayment,
   paymentWebhook,
@@ -33,6 +34,30 @@ router.get("/callback", (req, res) => {
       invoiceId: invoice_id || id,
     },
   });
+});
+
+// AlinmaPay sends an encrypted POST to merchantResponseUrl after payment
+// This is the success callback — it also needs to be processed as a webhook
+router.post("/callback", async (req, res) => {
+  try {
+    const result = await handleWebhookService(req.body);
+    // Extract payment status from the result for client-facing response
+    res.status(200).json({
+      status: "success",
+      data: {
+        paymentStatus: result.acknowledged ? "paid" : "failed",
+        message: "Payment processed successfully",
+      },
+    });
+  } catch {
+    res.status(200).json({
+      status: "success",
+      data: {
+        paymentStatus: "failed",
+        message: "Payment processing encountered an error",
+      },
+    });
+  }
 });
 
 // ─── Authenticated ──────────────────────────────────────────

@@ -8,6 +8,7 @@ import {
 } from "./roomAvailability.repository.js";
 import { findPricingByRoomTypeAndDateRange } from "../pricing/roomPricing.repository.js";
 import { cancellationDeadlines } from "../../../shared/constants/enums.js";
+import { convertSearchResults } from "../../../shared/services/currencyService.js";
 
 function resolveLabel(prefix, key, lang) {
   return t(`room.${prefix}_${key}`, lang);
@@ -196,7 +197,7 @@ export async function blockRoomsService(roomTypeId, body, lang) {
  * Public endpoint used by the booking flow.
  */
 export async function searchAvailableRoomsService(query, lang) {
-  const { checkIn, checkOut, guests } = query;
+  const { checkIn, checkOut, guests, currency = "SAR" } = query;
 
   const start = new Date(checkIn + "T00:00:00.000Z");
   const end = new Date(checkOut + "T00:00:00.000Z");
@@ -283,5 +284,6 @@ export async function searchAvailableRoomsService(query, lang) {
     }),
   );
 
-  return results;
+  // Convert prices to requested currency
+  return convertSearchResults(results, currency);
 }

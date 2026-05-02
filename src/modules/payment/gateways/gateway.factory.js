@@ -1,4 +1,5 @@
 import moyasarGateway from "./moyasar.gateway.js";
+import alinmapayGateway from "./alinmapay.gateway.js";
 
 /**
  * Gateway registry.
@@ -9,6 +10,7 @@ import moyasarGateway from "./moyasar.gateway.js";
  */
 const gateways = {
   moyasar: moyasarGateway,
+  alinmapay: alinmapayGateway,
   // tap: tapGateway,
   // hyperpay: hyperpayGateway,
 };

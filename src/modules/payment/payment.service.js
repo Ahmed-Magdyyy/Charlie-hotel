@@ -43,6 +43,7 @@ export async function initiatePaymentService(body, user, lang) {
     currency: "SAR",
     description: `Charlie Hotel — Booking ${booking.bookingNumber}`,
     bookingId: booking._id.toString(),
+    guestDetails: booking.guestDetails || {},
   });
 
   // Create payment record

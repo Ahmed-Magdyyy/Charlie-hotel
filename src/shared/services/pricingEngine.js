@@ -1,12 +1,18 @@
 import { findRoomTypeById } from "../../modules/room/types/roomType.repository.js";
 import { findPricingByRoomTypeAndDateRange } from "../../modules/room/pricing/roomPricing.repository.js";
+import { getLoyaltyConfig } from "../../modules/loyalty/loyalty.repository.js";
 import { ApiError } from "../utils/ApiError.js";
 import { t } from "../i18n/index.js";
-
-const VAT_RATE = 0.15; // Saudi 15% VAT
+import { MUN_TAX_RATE, VAT_RATE } from "../constants/enums.js";
 
 /**
  * Calculate full price breakdown for a booking.
+ *
+ * Tax order (Saudi):
+ *   1. Municipal tax 2.5% on taxable amount
+ *   2. VAT 15% on (taxable amount + municipal tax)
+ *
+ * Tier discount is applied after taxes on the grandTotal.
  *
  * @param {Object} params
  * @param {string} params.roomTypeId
@@ -17,9 +23,14 @@ const VAT_RATE = 0.15; // Saudi 15% VAT
  * @param {string} params.paymentOption     - e.g. "pay_now"
  * @param {number} [params.loyaltyPointsToRedeem=0]
  * @param {string} [lang="en"]
+ * @param {Object} [tierInfo]               - { name, discountRate }
  * @returns {Object} priceBreakdown
  */
-export async function calculatePriceBreakdown(params, lang = "en") {
+export async function calculatePriceBreakdown(
+  params,
+  lang = "en",
+  tierInfo = null,
+) {
   const {
     roomTypeId,
     checkIn,
@@ -33,16 +44,23 @@ export async function calculatePriceBreakdown(params, lang = "en") {
 
   // 1. Fetch room type
   const roomType = await findRoomTypeById(roomTypeId, { lean: true });
-  if (!roomType || !roomType.isActive) {
-    throw new ApiError(t("room.ROOM_NOT_FOUND", lang), 404);
+  if (!roomType) {
+    throw new ApiError(t("room.ROOM_TYPE_NOT_FOUND", lang), 404);
   }
 
-  // 2. Validate guest count
-  if (guests && guests > roomType.maxGuests) {
-    throw new ApiError(t("booking.GUESTS_EXCEED_MAX", lang), 400);
+  // 2. Date range validation
+  const start = new Date(checkIn + "T00:00:00.000Z");
+  const end = new Date(checkOut + "T00:00:00.000Z");
+
+  if (start >= end) {
+    throw new ApiError(t("booking.CHECK_OUT_BEFORE_CHECK_IN", lang), 400);
   }
 
-  // 3. Resolve selected option modifiers from the room type's config
+  const nights = Math.round(
+    (end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24),
+  );
+
+  // 3. Resolve booking options
   const resOption = roomType.reservationOptions?.find(
     (o) => o.type === reservationOption,
   );
@@ -64,50 +82,36 @@ export async function calculatePriceBreakdown(params, lang = "en") {
     throw new ApiError(t("booking.INVALID_PAYMENT_OPTION", lang), 400);
   }
 
-  // 3. Calculate date range
-  const start = new Date(checkIn + "T00:00:00.000Z");
-  const end = new Date(checkOut + "T00:00:00.000Z");
-
-  if (end <= start) {
-    throw new ApiError(t("room.AVAILABILITY_END_BEFORE_START", lang), 400);
-  }
-
-  const nights = (end - start) / (1000 * 60 * 60 * 24);
-
-  // 4. Fetch pricing overrides
-  const overrides = await findPricingByRoomTypeAndDateRange(
+  // 4. Get nightly pricing for the date range
+  const pricingDocs = await findPricingByRoomTypeAndDateRange(
     roomTypeId,
     start,
     end,
-  );
-  const overrideMap = new Map(
-    overrides.map((p) => [p.date.toISOString().slice(0, 10), p.price]),
   );
 
   // 5. Build nightly rates with modifiers
   const nightlyRates = [];
   const current = new Date(start);
+
   while (current < end) {
     const dateStr = current.toISOString().slice(0, 10);
-    const basePrice = overrideMap.get(dateStr) ?? roomType.basePrice;
+    const priceDoc = pricingDocs.find(
+      (p) => p.date.toISOString().slice(0, 10) === dateStr,
+    );
 
-    const modifiers = {
-      reservation: resOption.priceModifier,
-      cancellation: cancPolicy.priceModifier,
-      payment: payOption.priceModifier,
-    };
+    // Fallback to room's base price if no custom price is set for the date
+    const base = priceDoc ? priceDoc.price : roomType.basePrice;
 
-    const total =
-      basePrice +
-      modifiers.reservation +
-      modifiers.cancellation +
-      modifiers.payment;
+    const reservation = resOption.priceModifier || 0;
+    const cancellation = cancPolicy.priceModifier || 0;
+    const payment = payOption.priceModifier || 0;
 
     nightlyRates.push({
       date: dateStr,
-      basePrice,
-      modifiers,
-      total: Math.max(0, total), // price can't go negative
+      basePrice: base,
+      modifiers: { reservation, cancellation, payment },
+      total:
+        Math.round((base + reservation + cancellation + payment) * 100) / 100,
     });
 
     current.setUTCDate(current.getUTCDate() + 1);
@@ -117,19 +121,28 @@ export async function calculatePriceBreakdown(params, lang = "en") {
   const subtotal = nightlyRates.reduce((sum, n) => sum + n.total, 0);
 
   // 7. Loyalty discount (capped at subtotal)
-  const LOYALTY_POINT_VALUE = 0.1; // 1 point = 0.1 SAR (configurable later)
-  const maxDiscount = subtotal;
+  const loyaltyConfig = await getLoyaltyConfig();
+  const loyaltyPointValue = loyaltyConfig?.redeemRate || 0.1;
   const loyaltyDiscount = Math.min(
-    loyaltyPointsToRedeem * LOYALTY_POINT_VALUE,
-    maxDiscount,
+    loyaltyPointsToRedeem * loyaltyPointValue,
+    subtotal,
   );
 
-  // 8. Tax
-  const taxableAmount = subtotal - loyaltyDiscount;
-  const taxes = Math.round(taxableAmount * VAT_RATE * 100) / 100;
+  // 8. Tier discount (applied on subtotal after loyalty)
+  const tierDiscountRate = tierInfo?.discountRate || 0;
+  const tierName = tierInfo?.name || "premier";
+  const amountAfterLoyalty = Math.max(0, subtotal - loyaltyDiscount);
+  const tierDiscount = Math.round(amountAfterLoyalty * tierDiscountRate);
 
-  // 9. Grand total
-  const grandTotal = Math.round((taxableAmount + taxes) * 100) / 100;
+  // 9. Tax — Saudi order: mun tax 2.5% first, then VAT 15% on (amount + mun tax)
+  const taxableAmount = amountAfterLoyalty - tierDiscount;
+  const munTax = Math.round(taxableAmount * MUN_TAX_RATE * 100) / 100;
+  const vatAmount = Math.round((taxableAmount + munTax) * VAT_RATE * 100) / 100;
+  const taxes = Math.round((munTax + vatAmount) * 100) / 100;
+
+  // 10. Grand total / Final total (rounded to nearest integer)
+  const grandTotal = Math.round(taxableAmount + taxes);
+  const finalTotal = grandTotal; // For backward compatibility / consistent naming
 
   return {
     roomTypeId,
@@ -154,12 +167,20 @@ export async function calculatePriceBreakdown(params, lang = "en") {
       },
     },
     nightlyRates,
-    subtotal,
+    subtotal: Math.round(subtotal),
     loyaltyPointsRedeemed: loyaltyPointsToRedeem,
-    loyaltyDiscount,
-    taxableAmount,
+    loyaltyDiscount: Math.round(loyaltyDiscount),
+    tierName,
+    tierDiscountRate,
+    tierDiscount,
+    taxableAmount: Math.round(taxableAmount),
+    munTaxRate: MUN_TAX_RATE,
+    munTax: Math.round(munTax),
     vatRate: VAT_RATE,
-    taxes,
+    vatAmount: Math.round(vatAmount),
+    taxes: Math.round(taxes),
     grandTotal,
+    finalTotal,
+    currency: "SAR",
   };
 }

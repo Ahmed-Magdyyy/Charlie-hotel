@@ -18,6 +18,7 @@ import {
   cancelBookingValidator,
   updateBookingStatusValidator,
   listBookingsValidator,
+  listMyBookingsValidator,
 } from "./booking.validator.js";
 
 const router = Router();
@@ -30,7 +31,7 @@ router.use(protect);
 
 // Client routes
 router.post("/", createBookingValidator, createBooking);
-router.get("/my", getMyBookings);
+router.get("/my", listMyBookingsValidator, getMyBookings);
 
 // Staff/Admin routes
 router.post(

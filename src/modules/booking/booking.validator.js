@@ -5,6 +5,7 @@ import {
   reservationOptionTypes,
   cancellationPolicyTypes,
   paymentOptionTypes,
+  supportedCurrencies,
 } from "../../shared/constants/enums.js";
 
 // Shared date + option fields for calculate / create
@@ -75,6 +76,11 @@ export const calculateBookingValidator = [
     .optional()
     .isInt({ min: 0 })
     .withMessage("loyaltyPointsToRedeem must be a non-negative integer"),
+  query("currency")
+    .optional()
+    .toUpperCase()
+    .isIn(supportedCurrencies)
+    .withMessage(`currency must be one of: ${supportedCurrencies.join(", ")}`),
   validatorMiddleware,
 ];
 
@@ -105,6 +111,11 @@ export const createManualBookingValidator = [
 // GET /bookings/:bookingId
 export const getBookingValidator = [
   param("bookingId").isMongoId().withMessage("Invalid booking ID"),
+  query("currency")
+    .optional()
+    .toUpperCase()
+    .isIn(supportedCurrencies)
+    .withMessage(`currency must be one of: ${supportedCurrencies.join(", ")}`),
   validatorMiddleware,
 ];
 
@@ -153,5 +164,28 @@ export const listBookingsValidator = [
     .optional()
     .isInt({ min: 1, max: 100 })
     .withMessage("limit must be between 1 and 100"),
+  query("currency")
+    .optional()
+    .toUpperCase()
+    .isIn(supportedCurrencies)
+    .withMessage(`currency must be one of: ${supportedCurrencies.join(", ")}`),
+  validatorMiddleware,
+];
+
+// GET /bookings/my (client list)
+export const listMyBookingsValidator = [
+  query("page")
+    .optional()
+    .isInt({ min: 1 })
+    .withMessage("page must be a positive integer"),
+  query("limit")
+    .optional()
+    .isInt({ min: 1, max: 100 })
+    .withMessage("limit must be between 1 and 100"),
+  query("currency")
+    .optional()
+    .toUpperCase()
+    .isIn(supportedCurrencies)
+    .withMessage(`currency must be one of: ${supportedCurrencies.join(", ")}`),
   validatorMiddleware,
 ];

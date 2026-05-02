@@ -60,6 +60,16 @@ const userSchema = new mongoose.Schema(
       type: Number,
       default: 0,
     },
+    tier: {
+      type: String,
+      default: "premier",
+      trim: true,
+      lowercase: true,
+    },
+    totalSpent: {
+      type: Number,
+      default: 0,
+    },
     isActive: {
       type: Boolean,
       default: true,
