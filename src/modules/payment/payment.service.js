@@ -11,8 +11,14 @@ import {
   countPayments,
   updatePaymentById,
 } from "./payment.repository.js";
-import { findBookingById, updateBookingById } from "../booking/booking.repository.js";
-import { bookingStatus, bookingPaymentStatus } from "../../shared/constants/enums.js";
+import {
+  findBookingById,
+  updateBookingById,
+} from "../booking/booking.repository.js";
+import {
+  bookingStatus,
+  bookingPaymentStatus,
+} from "../../shared/constants/enums.js";
 import { buildPagination } from "../../shared/utils/apiFeatures.js";
 import { PaymentModel } from "./payment.model.js";
 
@@ -45,6 +51,8 @@ export async function initiatePaymentService(body, user, lang) {
     bookingId: booking._id.toString(),
     guestDetails: booking.guestDetails || {},
   });
+
+  console.log("payment result", result);
 
   // Create payment record
   const payment = await createPayment({
@@ -85,7 +93,9 @@ export async function handleWebhookService(reqBody) {
     payment = payments.find((p) => p.status === "initiated") || payments[0];
   }
   if (!payment) {
-    console.warn(`[Payment Webhook] Unknown payment — gatewayId: ${result.gatewayPaymentId}, bookingId: ${result.bookingId}`);
+    console.warn(
+      `[Payment Webhook] Unknown payment — gatewayId: ${result.gatewayPaymentId}, bookingId: ${result.bookingId}`,
+    );
     return { acknowledged: true };
   }
 
@@ -99,7 +109,12 @@ export async function handleWebhookService(reqBody) {
   if (result.needsVerification) {
     const verifyId = payment.gatewayPaymentId || result.gatewayPaymentId;
     const verified = await gateway.verify(verifyId);
-    result = { ...result, paid: verified.paid, method: verified.method, raw: verified.raw };
+    result = {
+      ...result,
+      paid: verified.paid,
+      method: verified.method,
+      raw: verified.raw,
+    };
   }
 
   const session = await mongoose.startSession();
@@ -153,7 +168,10 @@ export async function handleWebhookService(reqBody) {
           `[Payment Webhook] Booking ${booking.bookingNumber} expired but payment succeeded. Initiating auto-refund.`,
         );
         try {
-          const refundResult = await gateway.refund(result.gatewayPaymentId, payment.amount);
+          const refundResult = await gateway.refund(
+            result.gatewayPaymentId,
+            payment.amount,
+          );
           await PaymentModel.findByIdAndUpdate(payment._id, {
             status: "refunded",
             refundId: refundResult.refundId,
@@ -178,7 +196,10 @@ export async function handleWebhookService(reqBody) {
           `[Payment Webhook] Booking ${booking.bookingNumber} in status "${booking.status}" but payment succeeded. Initiating auto-refund.`,
         );
         try {
-          const refundResult = await gateway.refund(result.gatewayPaymentId, payment.amount);
+          const refundResult = await gateway.refund(
+            result.gatewayPaymentId,
+            payment.amount,
+          );
           await PaymentModel.findByIdAndUpdate(payment._id, {
             status: "refunded",
             refundId: refundResult.refundId,
@@ -232,7 +253,10 @@ export async function getPaymentByBookingService(bookingId, user, lang) {
 
   // Ownership or staff/admin check
   const isOwner = booking.client?.toString() === user._id.toString();
-  const isStaffOrAdmin = user.role === "admin" || user.role === "superAdmin" || user.role === "staff";
+  const isStaffOrAdmin =
+    user.role === "admin" ||
+    user.role === "superAdmin" ||
+    user.role === "staff";
   if (!isOwner && !isStaffOrAdmin) {
     throw new ApiError(t("common.NO_PERMISSION", lang), 403);
   }
