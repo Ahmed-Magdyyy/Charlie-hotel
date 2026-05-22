@@ -149,7 +149,13 @@ const alinmapayGateway = {
    * @param {Object} [params.guestDetails] - Guest information from the booking
    * @returns {Promise<InitiateResult>}
    */
-  async initiate({ amount, currency = "SAR", description, bookingId, guestDetails = {} }) {
+  async initiate({
+    amount,
+    currency = "SAR",
+    description,
+    bookingId,
+    guestDetails = {},
+  }) {
     const config = getConfig();
     const baseUrl = getBaseUrl();
     const formattedAmount = formatAmount(amount);
@@ -186,8 +192,8 @@ const alinmapayGateway = {
       additionalDetails: {
         userData: JSON.stringify({
           receiptUrl: config.responseUrl,
-        })
-      }
+        }),
+      },
     };
 
     const res = await fetch(baseUrl, {
@@ -202,7 +208,9 @@ const alinmapayGateway = {
       data = JSON.parse(responseText);
     } catch (parseErr) {
       // If response is HTML (e.g. 404 Not Found), throw a clear error
-      const err = new Error(`AlinmaPay API returned an invalid response (not JSON). HTTP Status: ${res.status}. Check the ALINMAPAY_BASE_URL. \nResponse: ${responseText.substring(0, 150)}...`);
+      const err = new Error(
+        `AlinmaPay API returned an invalid response (not JSON). HTTP Status: ${res.status}. Check the ALINMAPAY_BASE_URL. \nResponse: ${responseText.substring(0, 150)}...`,
+      );
       err.status = res.status;
       err.raw = responseText;
       throw err;
@@ -210,16 +218,21 @@ const alinmapayGateway = {
 
     if (!res.ok || !data.paymentLink?.linkUrl) {
       const msg =
-        data?.responseDescription || data?.reason || data?.message || "AlinmaPay API error";
+        data?.responseDescription ||
+        data?.reason ||
+        data?.message ||
+        "AlinmaPay API error";
       const err = new Error(msg);
       err.status = res.status;
       err.raw = data;
       throw err;
     }
+    console.log("data", data);
 
     return {
       gatewayPaymentId: data.paymentId || data.transactionId,
-      checkoutUrl: data.paymentLink.linkUrl + (data.paymentId || data.transactionId),
+      checkoutUrl:
+        data.paymentLink.linkUrl + (data.paymentId || data.transactionId),
       raw: data,
     };
   },
@@ -264,7 +277,10 @@ const alinmapayGateway = {
     try {
       data = JSON.parse(responseText);
     } catch {
-      console.error("[AlinmaPay] Verify returned non-JSON:", responseText.substring(0, 150));
+      console.error(
+        "[AlinmaPay] Verify returned non-JSON:",
+        responseText.substring(0, 150),
+      );
       return { paid: false, gatewayPaymentId, raw: responseText };
     }
 
@@ -275,7 +291,8 @@ const alinmapayGateway = {
 
     return {
       paid: isPaid,
-      gatewayPaymentId: data.paymentId || data.transactionId || gatewayPaymentId,
+      gatewayPaymentId:
+        data.paymentId || data.transactionId || gatewayPaymentId,
       method: mapAlinmaMethod(
         data.cardDetails?.cardType || data.instrumentType,
       ),

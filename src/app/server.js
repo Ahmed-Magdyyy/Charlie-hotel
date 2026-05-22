@@ -8,6 +8,7 @@ import morgan from "morgan";
 import helmet from "helmet";
 import compression from "compression";
 import cookieParser from "cookie-parser";
+import cors from "cors";
 import https from "https";
 import { ApiError } from "../shared/utils/ApiError.js";
 import {
@@ -23,6 +24,9 @@ import { startPaymentReconciliationJob } from "../shared/jobs/paymentReconciliat
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 config({ path: path.resolve(__dirname, "../../.env") });
+
+// CORS – accept all origins (with credentials support)
+app.use(cors({ origin: true, credentials: true }));
 
 // middlewares
 app.set("trust proxy", 1);
