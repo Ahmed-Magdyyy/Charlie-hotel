@@ -26,37 +26,31 @@ router.post("/webhook", paymentWebhook);
 router.get("/callback", (req, res) => {
   const { id, status, message, invoice_id } = req.query;
   const isPaid = status === "paid";
-  res.status(200).json({
-    status: "success",
-    data: {
-      paymentStatus: isPaid ? "paid" : "failed",
-      message: isPaid ? "Payment completed successfully" : message || "Payment failed",
-      invoiceId: invoice_id || id,
-    },
+  const clientUrl = process.env.CLIENT_URL || "https://example.com";
+  const params = new URLSearchParams({
+    paymentStatus: isPaid ? "paid" : "failed",
+    invoiceId: invoice_id || id || "",
+    ...(isPaid ? {} : { message: message || "Payment failed" }),
   });
+  res.redirect(`${clientUrl}/booking/confirmation?${params.toString()}`);
 });
 
 // AlinmaPay sends an encrypted POST to merchantResponseUrl after payment
 // This is the success callback — it also needs to be processed as a webhook
 router.post("/callback", async (req, res) => {
+  const clientUrl = process.env.CLIENT_URL || "https://example.com";
   try {
     const result = await handleWebhookService(req.body);
-    // Extract payment status from the result for client-facing response
-    res.status(200).json({
-      status: "success",
-      data: {
-        paymentStatus: result.acknowledged ? "paid" : "failed",
-        message: "Payment processed successfully",
-      },
+    const params = new URLSearchParams({
+      paymentStatus: result.acknowledged ? "paid" : "failed",
     });
+    res.redirect(`${clientUrl}/booking/confirmation?${params.toString()}`);
   } catch {
-    res.status(200).json({
-      status: "success",
-      data: {
-        paymentStatus: "failed",
-        message: "Payment processing encountered an error",
-      },
+    const params = new URLSearchParams({
+      paymentStatus: "failed",
+      message: "Payment processing encountered an error",
     });
+    res.redirect(`${clientUrl}/booking/confirmation?${params.toString()}`);
   }
 });
 
