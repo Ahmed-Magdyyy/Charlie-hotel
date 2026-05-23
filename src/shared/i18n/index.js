@@ -8,6 +8,7 @@ import payment from "./modules/payment.js";
 import loyalty from "./modules/loyalty.js";
 import tier from "./modules/tier.js";
 import analytics from "./modules/analytics.js";
+import enumLabels from "./modules/enumLabels.js";
 
 const messages = { common, auth, user, room, booking, payment, loyalty, tier, analytics };
 
@@ -25,4 +26,16 @@ export function t(key, lang = "en", vars = {}) {
     text = text.replaceAll(`{{${k}}}`, v);
   }
   return text;
+}
+
+/**
+ * Translate a raw enum value to a human-readable label.
+ * Falls back to the raw value if no label is found.
+ * @param {string} value - The raw enum value, e.g. "breakfast"
+ * @param {string} [lang="en"] - Language code
+ * @returns {string} Translated label, e.g. "إفطار" for lang="ar"
+ */
+export function translateEnum(value, lang = "en") {
+  const label = enumLabels[value];
+  return label?.[lang] || label?.["en"] || value;
 }

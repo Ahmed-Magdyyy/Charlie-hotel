@@ -2,7 +2,7 @@ import { findRoomTypeById } from "../../modules/room/types/roomType.repository.j
 import { findPricingByRoomTypeAndDateRange } from "../../modules/room/pricing/roomPricing.repository.js";
 import { getLoyaltyConfig } from "../../modules/loyalty/loyalty.repository.js";
 import { ApiError } from "../utils/ApiError.js";
-import { t } from "../i18n/index.js";
+import { t, translateEnum } from "../i18n/index.js";
 import { MUN_TAX_RATE, VAT_RATE } from "../constants/enums.js";
 
 /**
@@ -66,10 +66,12 @@ export async function calculatePriceBreakdown(
   );
   if (!resOption) {
     const validOptions =
-      roomType.reservationOptions?.map((o) => o.type).join(", ") || "none";
+      roomType.reservationOptions
+        ?.map((o) => translateEnum(o.type, lang))
+        .join(", ") || "none";
     throw new ApiError(
       t("booking.INVALID_RESERVATION_OPTION", lang, {
-        sent: reservationOption,
+        sent: translateEnum(reservationOption, lang),
         valid: validOptions,
       }),
       400,
@@ -81,10 +83,12 @@ export async function calculatePriceBreakdown(
   );
   if (!cancPolicy) {
     const validPolicies =
-      roomType.cancellationPolicies?.map((p) => p.type).join(", ") || "none";
+      roomType.cancellationPolicies
+        ?.map((p) => translateEnum(p.type, lang))
+        .join(", ") || "none";
     throw new ApiError(
       t("booking.INVALID_CANCELLATION_POLICY", lang, {
-        sent: cancellationPolicy,
+        sent: translateEnum(cancellationPolicy, lang),
         valid: validPolicies,
       }),
       400,
@@ -96,10 +100,12 @@ export async function calculatePriceBreakdown(
   );
   if (!payOption) {
     const validPayments =
-      roomType.paymentOptions?.map((o) => o.type).join(", ") || "none";
+      roomType.paymentOptions
+        ?.map((o) => translateEnum(o.type, lang))
+        .join(", ") || "none";
     throw new ApiError(
       t("booking.INVALID_PAYMENT_OPTION", lang, {
-        sent: paymentOption,
+        sent: translateEnum(paymentOption, lang),
         valid: validPayments,
       }),
       400,
