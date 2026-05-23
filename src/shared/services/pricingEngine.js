@@ -65,21 +65,45 @@ export async function calculatePriceBreakdown(
     (o) => o.type === reservationOption,
   );
   if (!resOption) {
-    throw new ApiError(t("booking.INVALID_RESERVATION_OPTION", lang), 400);
+    const validOptions =
+      roomType.reservationOptions?.map((o) => o.type).join(", ") || "none";
+    throw new ApiError(
+      t("booking.INVALID_RESERVATION_OPTION", lang, {
+        sent: reservationOption,
+        valid: validOptions,
+      }),
+      400,
+    );
   }
 
   const cancPolicy = roomType.cancellationPolicies?.find(
     (p) => p.type === cancellationPolicy,
   );
   if (!cancPolicy) {
-    throw new ApiError(t("booking.INVALID_CANCELLATION_POLICY", lang), 400);
+    const validPolicies =
+      roomType.cancellationPolicies?.map((p) => p.type).join(", ") || "none";
+    throw new ApiError(
+      t("booking.INVALID_CANCELLATION_POLICY", lang, {
+        sent: cancellationPolicy,
+        valid: validPolicies,
+      }),
+      400,
+    );
   }
 
   const payOption = roomType.paymentOptions?.find(
     (o) => o.type === paymentOption,
   );
   if (!payOption) {
-    throw new ApiError(t("booking.INVALID_PAYMENT_OPTION", lang), 400);
+    const validPayments =
+      roomType.paymentOptions?.map((o) => o.type).join(", ") || "none";
+    throw new ApiError(
+      t("booking.INVALID_PAYMENT_OPTION", lang, {
+        sent: paymentOption,
+        valid: validPayments,
+      }),
+      400,
+    );
   }
 
   // 4. Get nightly pricing for the date range

@@ -4,16 +4,16 @@
 export default {
   // ─── Validation Errors ────────────────────────────────────
   INVALID_RESERVATION_OPTION: {
-    en: "Invalid reservation option for this room type",
-    ar: "خيار الحجز غير صالح لهذا النوع من الغرف",
+    en: "Invalid reservation option '{{sent}}' for this room type. Valid options: [{{valid}}]",
+    ar: "خيار الحجز '{{sent}}' غير صالح لهذا النوع من الغرف. الخيارات المتاحة: [{{valid}}]",
   },
   INVALID_CANCELLATION_POLICY: {
-    en: "Invalid cancellation policy for this room type",
-    ar: "سياسة الإلغاء غير صالحة لهذا النوع من الغرف",
+    en: "Invalid cancellation policy '{{sent}}' for this room type. Valid policies: [{{valid}}]",
+    ar: "سياسة الإلغاء '{{sent}}' غير صالحة لهذا النوع من الغرف. السياسات المتاحة: [{{valid}}]",
   },
   INVALID_PAYMENT_OPTION: {
-    en: "Invalid payment option for this room type",
-    ar: "خيار الدفع غير صالح لهذا النوع من الغرف",
+    en: "Invalid payment option '{{sent}}' for this room type. Valid options: [{{valid}}]",
+    ar: "خيار الدفع '{{sent}}' غير صالحة لهذا النوع من الغرف. الخيارات المتاحة: [{{valid}}]",
   },
   GUESTS_EXCEED_MAX: {
     en: "Number of guests exceeds the room's maximum capacity",
