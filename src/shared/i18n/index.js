@@ -7,8 +7,9 @@ import booking from "./modules/booking.js";
 import payment from "./modules/payment.js";
 import loyalty from "./modules/loyalty.js";
 import tier from "./modules/tier.js";
+import analytics from "./modules/analytics.js";
 
-const messages = { common, auth, user, room, booking, payment, loyalty, tier };
+const messages = { common, auth, user, room, booking, payment, loyalty, tier, analytics };
 
 /**
  * Translate a message key to the given language.
