@@ -6,6 +6,7 @@ import {
   refundPaymentService,
   markPayAtHotelPaidService,
   getAllPaymentsService,
+  getOnePaymentService,
 } from "./payment.service.js";
 import { t } from "../../shared/i18n/index.js";
 
@@ -67,4 +68,10 @@ export const markPayAtHotelPaid = asyncHandler(async (req, res) => {
 export const getAllPayments = asyncHandler(async (req, res) => {
   const data = await getAllPaymentsService(req.query, req.lang);
   res.status(200).json({ status: "success", ...data });
+});
+
+// GET /api/v1/payments/admin/:paymentId
+export const getOnePayment = asyncHandler(async (req, res) => {
+  const data = await getOnePaymentService(req.params.paymentId, req.lang);
+  res.status(200).json({ status: "success", data });
 });

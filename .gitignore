@@ -27,3 +27,7 @@ extract_urls.py
 .gitignore
 new_pdf_content.txt
 Transaction_Response_Codes.pdf
+.gemini/AlinmaPay Payment Gateway API Specifications Version3.1.json
+.gemini/Alinmapay_Payment_Gateway_API.json
+.gemini/AlinmaPay Payment Gateway API Specifications Version3.1.content.txt
+.gemini/Alinmapay_Payment_Gateway_API.content.txt

@@ -30,6 +30,12 @@ export const listPaymentsValidator = [
     .optional()
     .isIn(["initiated", "paid", "failed", "refunded"])
     .withMessage("Invalid status filter"),
+  query("q")
+    .optional()
+    .isString()
+    .trim()
+    .isLength({ min: 1, max: 100 })
+    .withMessage("q must be between 1 and 100 characters"),
   query("page")
     .optional()
     .isInt({ min: 1 })
@@ -38,5 +44,18 @@ export const listPaymentsValidator = [
     .optional()
     .isInt({ min: 1, max: 100 })
     .withMessage("limit must be between 1 and 100"),
+  query("startDate")
+    .optional()
+    .isISO8601()
+    .withMessage("startDate must be a valid date (YYYY-MM-DD)"),
+  query("endDate")
+    .optional()
+    .isISO8601()
+    .withMessage("endDate must be a valid date (YYYY-MM-DD)"),
+  validatorMiddleware,
+];
+
+export const getOnePaymentValidator = [
+  param("paymentId").isMongoId().withMessage("Invalid payment ID"),
   validatorMiddleware,
 ];

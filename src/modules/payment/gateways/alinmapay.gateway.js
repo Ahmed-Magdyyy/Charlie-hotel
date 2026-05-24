@@ -373,9 +373,10 @@ const alinmapayGateway = {
     const config = getConfig();
     const baseUrl = getBaseUrl();
     const formattedAmount = formatAmount(amount);
+    const orderId = `REFUND-${gatewayPaymentId.slice(-10)}`;
 
     const hash = generateRequestHash(
-      gatewayPaymentId,
+      orderId,
       config.terminalId,
       config.password,
       config.merchantKey,
@@ -384,14 +385,22 @@ const alinmapayGateway = {
     );
 
     const payload = {
+      referenceId: gatewayPaymentId,
       terminalId: config.terminalId,
       password: config.password,
-      action: 2, // Refund
-      paymentId: gatewayPaymentId,
+      paymentType: "2", // 2 = Refund
       amount: formattedAmount,
       currency: "SAR",
-      hashDigest: hash,
+      signature: hash,
+      order: {
+        orderId,
+      },
+      customer: {
+        billingAddressCountry: "SA",
+      },
     };
+
+    console.log("[AlinmaPay] Refund request:", JSON.stringify(payload, null, 2));
 
     const res = await fetch(baseUrl, {
       method: "POST",
@@ -399,12 +408,21 @@ const alinmapayGateway = {
       body: JSON.stringify(payload),
     });
 
-    const data = await res.json();
+    const responseText = await res.text();
+    let data;
+    try {
+      data = JSON.parse(responseText);
+    } catch {
+      console.error("[AlinmaPay] Refund returned non-JSON:", responseText.substring(0, 150));
+      return { success: false, raw: responseText };
+    }
+
+    console.log("[AlinmaPay] Refund response:", JSON.stringify(data, null, 2));
 
     const isSuccess =
       data.responseCode === "000" ||
       data.responseCode === "001" ||
-      data.status === "SUCCESS";
+      data.result === "SUCCESS";
 
     return {
       success: isSuccess,

@@ -18,7 +18,7 @@ import { t } from "../../shared/i18n/index.js";
 
 // GET /api/v1/users
 export const getUsers = asyncHandler(async (req, res) => {
-  const result = await getUsersService(req.query);
+  const result = await getUsersService(req.query, req.user);
   res.status(200).json(result);
 });
 

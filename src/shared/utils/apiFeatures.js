@@ -45,7 +45,7 @@ export function buildSort({ sort }, defaultSort = "-createdAt") {
 // Build a generic regex-based filter from query params.
 export function buildRegexFilter(query, excludeKeys = []) {
   const filter = {};
-  const excluded = new Set([...excludeKeys, "lang"]);
+  const excluded = new Set([...excludeKeys, "lang", "sort", "page", "limit", "fields", "q"]);
 
   Object.keys(query).forEach((key) => {
     if (excluded.has(key)) return;
@@ -60,4 +60,40 @@ export function buildRegexFilter(query, excludeKeys = []) {
   });
 
   return filter;
+}
+
+// Build date range filter for createdAt, defaulting to today
+export function buildDateRangeFilter(query) {
+  const now = new Date();
+  
+  let startDateStr = query.startDate;
+  let endDateStr = query.endDate;
+
+  // Default to today if neither is provided
+  if (!startDateStr && !endDateStr) {
+    startDateStr = now.toISOString().slice(0, 10);
+    endDateStr = startDateStr;
+  }
+
+  const startDate = startDateStr ? new Date(startDateStr + "T00:00:00.000Z") : null;
+  const endDate = endDateStr 
+    ? new Date(endDateStr + "T23:59:59.999Z")
+    : startDate 
+      ? new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 23, 59, 59, 999))
+      : null;
+
+  const dateFilter = {};
+  if (startDate || endDate) {
+    dateFilter.createdAt = {};
+    if (startDate) dateFilter.createdAt.$gte = startDate;
+    if (endDate) dateFilter.createdAt.$lte = endDate;
+  }
+
+  const timeFrame = {
+    type: (!query.startDate && !query.endDate) ? "today" : "custom",
+    startDate: startDateStr || null,
+    endDate: endDateStr || (startDateStr ? now.toISOString().slice(0, 10) : null),
+  };
+
+  return { dateFilter, timeFrame };
 }

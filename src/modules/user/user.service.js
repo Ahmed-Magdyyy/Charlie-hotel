@@ -33,19 +33,26 @@ const mapUserToResponse = (user) => {
 
 // ----- Admin Services -----
 
-export async function getUsersService(queryParams) {
+export async function getUsersService(queryParams, requesterUser) {
   const { page, limit, ...query } = queryParams;
 
   const filter = {
-    role: { $ne: roles.ADMIN },
-    ...buildRegexFilter(query, [
-      "role",
-      "phone",
-      "email",
-      "firstName",
-      "lastName",
-    ]),
+    ...buildRegexFilter(query, ["role"]),
   };
+
+  // Only restrict from seeing admins if the requester is NOT an admin
+  if (requesterUser?.role !== roles.ADMIN) {
+    filter.role = { $ne: roles.ADMIN };
+  }
+
+  if (query.role) {
+    if (query.role === roles.ADMIN && requesterUser?.role !== roles.ADMIN) {
+      // Searching for admins is protected for non-admins, return empty
+      filter.role = "non_existent_role";
+    } else {
+      filter.role = query.role;
+    }
+  }
 
   const totalUsersCount = await UserModel.countDocuments(filter);
 

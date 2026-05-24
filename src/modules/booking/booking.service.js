@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import { BookingModel } from "./booking.model.js";
 import { ApiError } from "../../shared/utils/ApiError.js";
 import { t } from "../../shared/i18n/index.js";
 import { calculatePriceBreakdown } from "../../shared/services/pricingEngine.js";
@@ -22,7 +23,7 @@ import {
   bookingStatusTransitions,
   cancellationDeadlines,
 } from "../../shared/constants/enums.js";
-import { buildPagination, buildSort } from "../../shared/utils/apiFeatures.js";
+import { buildPagination, buildSort, buildDateRangeFilter } from "../../shared/utils/apiFeatures.js";
 import { UserModel } from "../user/user.model.js";
 import { getLoyaltyConfig } from "../loyalty/loyalty.repository.js";
 import {
@@ -447,13 +448,16 @@ export async function getMyBookingsService(user, queryParams, lang) {
   const { page, limit, currency = "SAR" } = queryParams;
   const totalCount = await countBookingsByClient(user._id);
   const { pageNum, limitNum, skip } = buildPagination({ page, limit }, 10);
+  const sort = buildSort(queryParams, "-createdAt");
 
-  const bookings = await findBookingsByClient(user._id, {
-    skip,
-    limit: limitNum,
-    populate: { path: "roomType", select: "name images" },
-    lean: true,
-  });
+  let query = BookingModel.find({ client: user._id })
+    .sort(sort || { createdAt: -1 })
+    .skip(skip)
+    .limit(limitNum)
+    .populate({ path: "roomType", select: "name images" })
+    .lean();
+
+  const bookings = await query;
 
   // Convert prices if non-SAR currency requested
   if (currency.toUpperCase() !== "SAR") {
@@ -478,13 +482,56 @@ export async function getMyBookingsService(user, queryParams, lang) {
 // ─── List All Bookings (Admin/Staff) ───────────────────────
 
 export async function getAllBookingsService(queryParams, lang) {
-  const { page, limit, status, paymentStatus, roomTypeId, currency = "SAR", ...rest } =
+  const { page, limit, status, paymentStatus, roomTypeId, q, currency = "SAR", startDate, endDate, ...rest } =
     queryParams;
 
+  const { dateFilter, timeFrame } = buildDateRangeFilter(queryParams);
+
   const filter = {};
+  if (dateFilter.createdAt) {
+    filter.checkIn = { $lte: dateFilter.createdAt.$lte };
+    filter.checkOut = { $gte: dateFilter.createdAt.$gte };
+  }
   if (status) filter.status = status;
   if (paymentStatus) filter.paymentStatus = paymentStatus;
   if (roomTypeId) filter.roomType = roomTypeId;
+
+  // Full-text-like search across booking number, guest details, and client user
+  if (q && q.trim()) {
+    const regex = { $regex: q.trim(), $options: "i" };
+    const orConditions = [
+      { bookingNumber: regex },
+      { "guestDetails.email": regex },
+      { "guestDetails.phone": regex },
+      { "guestDetails.firstName": regex },
+      { "guestDetails.lastName": regex },
+    ];
+
+    // If q looks like a valid ObjectId, also search by client ID
+    if (/^[0-9a-fA-F]{24}$/.test(q.trim())) {
+      orConditions.push({ client: q.trim() });
+    }
+
+    // Also search across User records (email, phone, name)
+    const matchingUsers = await UserModel.find({
+      $or: [
+        { email: regex },
+        { phone: regex },
+        { firstName: regex },
+        { lastName: regex },
+      ],
+    })
+      .select("_id")
+      .lean();
+
+    if (matchingUsers.length > 0) {
+      orConditions.push({
+        client: { $in: matchingUsers.map((u) => u._id) },
+      });
+    }
+
+    filter.$or = orConditions;
+  }
 
   const totalCount = await countBookings(filter);
   const { pageNum, limitNum, skip } = buildPagination({ page, limit }, 20);
@@ -514,6 +561,7 @@ export async function getAllBookingsService(queryParams, lang) {
   }
 
   return {
+    timeFrame,
     totalPages: Math.ceil(totalCount / limitNum) || 1,
     page: pageNum,
     results: bookings.length,

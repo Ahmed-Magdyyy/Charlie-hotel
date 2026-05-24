@@ -8,6 +8,7 @@ import {
   refundPayment,
   markPayAtHotelPaid,
   getAllPayments,
+  getOnePayment,
 } from "./payment.controller.js";
 import {
   initiatePaymentValidator,
@@ -15,6 +16,7 @@ import {
   refundPaymentValidator,
   collectPaymentValidator,
   listPaymentsValidator,
+  getOnePaymentValidator,
 } from "./payment.validator.js";
 
 const router = Router();
@@ -60,9 +62,6 @@ router.use(protect);
 // Client initiates payment
 router.post("/initiate", initiatePaymentValidator, initiatePayment);
 
-// Get payments for a booking (owner or staff/admin)
-router.get("/:bookingId", getPaymentValidator, getPaymentByBooking);
-
 // Admin-only
 router.get(
   "/",
@@ -70,6 +69,16 @@ router.get(
   listPaymentsValidator,
   getAllPayments,
 );
+
+router.get(
+  "/:paymentId/details",
+  requirePermission("reservations", "read"),
+  getOnePaymentValidator,
+  getOnePayment,
+);
+
+// Get payments for a booking (owner or staff/admin)
+router.get("/:bookingId", getPaymentValidator, getPaymentByBooking);
 
 router.patch(
   "/:bookingId/collect",

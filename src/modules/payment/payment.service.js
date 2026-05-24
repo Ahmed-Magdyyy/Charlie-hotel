@@ -19,7 +19,7 @@ import {
   bookingStatus,
   bookingPaymentStatus,
 } from "../../shared/constants/enums.js";
-import { buildPagination } from "../../shared/utils/apiFeatures.js";
+import { buildPagination, buildDateRangeFilter } from "../../shared/utils/apiFeatures.js";
 import { PaymentModel } from "./payment.model.js";
 import {
   notifyGuestBookingConfirmed,
@@ -166,12 +166,17 @@ export async function handleWebhookService(reqBody) {
         // Send emails after commit (fire-and-forget)
         session.once("ended", async () => {
           try {
-            const roomType = await findRoomTypeById(booking.roomType, { lean: true });
+            const roomType = await findRoomTypeById(booking.roomType, {
+              lean: true,
+            });
             const roomTypeName = roomType?.name || "Room";
             notifyGuestBookingConfirmed(booking, roomTypeName);
             notifyStaffNewBooking(booking, roomTypeName);
           } catch (emailErr) {
-            console.error("[BOOKING_NOTIFY] Post-payment email error:", emailErr.message);
+            console.error(
+              "[BOOKING_NOTIFY] Post-payment email error:",
+              emailErr.message,
+            );
           }
         });
       } else if (booking.status === bookingStatus.EXPIRED) {
@@ -321,6 +326,12 @@ export async function refundPaymentService(paymentId, user, lang) {
       });
       await booking.save();
     }
+  } else {
+    const reason = result.raw?.reason || result.raw?.result || "Unknown error";
+    throw new ApiError(
+      t("payment.REFUND_FAILED", lang) || `Refund failed: ${reason}`,
+      502,
+    );
   }
 
   return result;
@@ -379,10 +390,101 @@ export async function markPayAtHotelPaidService(bookingId, user, lang) {
 // ─── List All Payments (Admin) ─────────────────────────────
 
 export async function getAllPaymentsService(queryParams, lang) {
-  const { page, limit, status } = queryParams;
+  const { page, limit, status, q, startDate, endDate, ...rest } = queryParams;
 
-  const filter = {};
+  const { dateFilter, timeFrame } = buildDateRangeFilter(queryParams);
+
+  const filter = {
+    ...dateFilter,
+  };
   if (status) filter.status = status;
+
+  // Search across payment ID, booking number, user email/phone
+  if (q && q.trim()) {
+    const searchTerm = q.trim();
+    const regex = { $regex: searchTerm, $options: "i" };
+    const orConditions = [];
+
+    // Direct match on gatewayPaymentId
+    orConditions.push({ gatewayPaymentId: regex });
+
+    // If q looks like a valid ObjectId, also search by payment _id
+    if (/^[0-9a-fA-F]{24}$/.test(searchTerm)) {
+      orConditions.push({ _id: searchTerm });
+    }
+
+    // Find users matching by email, phone, name
+    const { UserModel } = await import("../user/user.model.js");
+    const matchingUsers = await UserModel.find({
+      $or: [
+        { email: regex },
+        { phone: regex },
+        { firstName: regex },
+        { lastName: regex },
+      ],
+    })
+      .select("_id")
+      .lean();
+
+    const matchingUserIds = matchingUsers.map((u) => u._id);
+
+    // Find bookings matching by bookingNumber, guestDetails, or client user
+    const { BookingModel } = await import("../booking/booking.model.js");
+    const bookingOrConditions = [
+      { bookingNumber: regex },
+      { "guestDetails.email": regex },
+      { "guestDetails.phone": regex },
+    ];
+
+    if (matchingUserIds.length > 0) {
+      bookingOrConditions.push({ client: { $in: matchingUserIds } });
+    }
+
+    const matchingBookings = await BookingModel.find({
+      $or: bookingOrConditions,
+    })
+      .select("_id")
+      .lean();
+
+    if (matchingBookings.length > 0) {
+      orConditions.push({
+        booking: { $in: matchingBookings.map((b) => b._id) },
+      });
+    }
+
+    if (orConditions.length > 0) {
+      filter.$or = orConditions;
+    }
+  }
+
+  // Summary stats (across all matching payments, not just current page)
+  const [summaryResult] = await PaymentModel.aggregate([
+    { $match: filter },
+    {
+      $group: {
+        _id: null,
+        totalCollected: {
+          $sum: { $cond: [{ $eq: ["$status", "paid"] }, "$amount", 0] },
+        },
+        totalRefunded: {
+          $sum: { $cond: [{ $eq: ["$status", "refunded"] }, "$amount", 0] },
+        },
+        pendingCount: {
+          $sum: { $cond: [{ $eq: ["$status", "initiated"] }, 1, 0] },
+        },
+        failedCount: {
+          $sum: { $cond: [{ $eq: ["$status", "failed"] }, 1, 0] },
+        },
+      },
+    },
+  ]);
+
+  const summary = {
+    totalCollected: summaryResult?.totalCollected || 0,
+    totalRefunded: summaryResult?.totalRefunded || 0,
+    pendingCount: summaryResult?.pendingCount || 0,
+    failedCount: summaryResult?.failedCount || 0,
+  };
 
   const totalCount = await countPayments(filter);
   const { pageNum, limitNum, skip } = buildPagination({ page, limit }, 20);
@@ -390,14 +492,39 @@ export async function getAllPaymentsService(queryParams, lang) {
   const payments = await findPayments(filter, {
     skip,
     limit: limitNum,
-    populate: { path: "booking", select: "bookingNumber client" },
+    populate: {
+      path: "booking",
+      select: "bookingNumber client guestDetails",
+      populate: { path: "client", select: "firstName lastName email phone" },
+    },
     lean: true,
   });
 
   return {
+    timeFrame,
     totalPages: Math.ceil(totalCount / limitNum) || 1,
     page: pageNum,
     results: payments.length,
+    summary,
     payments,
   };
+}
+
+// ─── Get One Payment (Admin) ───────────────────────────────
+
+export async function getOnePaymentService(paymentId, lang) {
+  const payment = await findPaymentById(paymentId, {
+    populate: {
+      path: "booking",
+      select: "bookingNumber client guestDetails status paymentStatus roomType checkIn checkOut",
+      populate: { path: "client", select: "firstName lastName email phone" },
+    },
+    lean: true,
+  });
+
+  if (!payment) {
+    throw new ApiError(t("payment.PAYMENT_NOT_FOUND", lang), 404);
+  }
+
+  return payment;
 }

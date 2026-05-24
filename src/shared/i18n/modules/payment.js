@@ -19,6 +19,10 @@ export default {
     en: "Payment refunded successfully",
     ar: "تم استرداد المبلغ بنجاح",
   },
+  REFUND_FAILED: {
+    en: "Refund failed — the payment gateway rejected the request",
+    ar: "فشل الاسترداد — رفضت بوابة الدفع الطلب",
+  },
   PAYMENT_INITIATED: {
     en: "Payment session created — redirect to checkout",
     ar: "تم إنشاء جلسة الدفع — يرجى التوجه لإتمام الدفع",

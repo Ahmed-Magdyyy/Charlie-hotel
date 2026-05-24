@@ -156,6 +156,12 @@ export const listBookingsValidator = [
     .optional()
     .isMongoId()
     .withMessage("Invalid roomTypeId filter"),
+  query("q")
+    .optional()
+    .isString()
+    .trim()
+    .isLength({ min: 1, max: 100 })
+    .withMessage("q must be between 1 and 100 characters"),
   query("page")
     .optional()
     .isInt({ min: 1 })
@@ -169,6 +175,14 @@ export const listBookingsValidator = [
     .toUpperCase()
     .isIn(supportedCurrencies)
     .withMessage(`currency must be one of: ${supportedCurrencies.join(", ")}`),
+  query("startDate")
+    .optional()
+    .isISO8601()
+    .withMessage("startDate must be a valid date (YYYY-MM-DD)"),
+  query("endDate")
+    .optional()
+    .isISO8601()
+    .withMessage("endDate must be a valid date (YYYY-MM-DD)"),
   validatorMiddleware,
 ];
 
@@ -182,6 +196,10 @@ export const listMyBookingsValidator = [
     .optional()
     .isInt({ min: 1, max: 100 })
     .withMessage("limit must be between 1 and 100"),
+  query("sort")
+    .optional()
+    .isIn(["newest", "oldest", "-createdAt", "createdAt"])
+    .withMessage("sort must be one of: newest, oldest, -createdAt, createdAt"),
   query("currency")
     .optional()
     .toUpperCase()
