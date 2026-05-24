@@ -32,6 +32,12 @@ import {
 } from "../loyalty/loyalty.service.js";
 import { initiatePaymentService } from "../payment/payment.service.js";
 import { resolveTier, updateUserSpentAndTier } from "../tier/tier.service.js";
+import {
+  notifyGuestBookingConfirmed,
+  notifyStaffNewBooking,
+  notifyGuestStatusChanged,
+} from "./bookingNotifications.js";
+import { findRoomTypeById } from "../room/types/roomType.repository.js";
 
 const PENDING_EXPIRY_MINUTES = 15;
 
@@ -250,6 +256,14 @@ export async function createBookingService(body, user, lang) {
       };
     }
 
+    // 9. Notifications for pay_at_hotel bookings (confirmed immediately)
+    if (!isPay) {
+      const roomType = await findRoomTypeById(roomTypeId, { lean: true });
+      const roomTypeName = roomType?.name || "Room";
+      notifyGuestBookingConfirmed(booking, roomTypeName);
+      notifyStaffNewBooking(booking, roomTypeName);
+    }
+
     return booking;
   } catch (err) {
     if (session.inTransaction()) await session.abortTransaction();
@@ -372,6 +386,13 @@ export async function createManualBookingService(body, staffUser, lang) {
     );
 
     await session.commitTransaction();
+
+    // Notifications for manual booking
+    const roomType = await findRoomTypeById(roomTypeId, { lean: true });
+    const roomTypeName = roomType?.name || "Room";
+    notifyGuestBookingConfirmed(booking, roomTypeName);
+    notifyStaffNewBooking(booking, roomTypeName, true);
+
     return booking;
   } catch (err) {
     if (session.inTransaction()) await session.abortTransaction();
@@ -508,6 +529,8 @@ export async function cancelBookingService(bookingId, user, lang) {
     throw new ApiError(t("booking.BOOKING_NOT_FOUND", lang), 404);
   }
 
+  const oldStatus = booking.status;
+
   // Check if already cancelled
   if (booking.status === bookingStatus.CANCELLED) {
     throw new ApiError(t("booking.BOOKING_ALREADY_CANCELLED", lang), 400);
@@ -587,6 +610,17 @@ export async function cancelBookingService(bookingId, user, lang) {
     await booking.save({ session });
     await session.commitTransaction();
 
+    // Notify guest about cancellation
+    const roomType = await findRoomTypeById(booking.roomType, { lean: true });
+    const roomTypeName = roomType?.name || "Room";
+    notifyGuestStatusChanged(
+      booking,
+      roomTypeName,
+      oldStatus,
+      bookingStatus.CANCELLED,
+      isStaffOrAdmin ? "Cancelled by staff/admin" : "Cancelled by guest",
+    );
+
     return booking;
   } catch (err) {
     if (session.inTransaction()) await session.abortTransaction();
@@ -605,6 +639,8 @@ export async function updateBookingStatusService(bookingId, body, user, lang) {
   if (!booking) {
     throw new ApiError(t("booking.BOOKING_NOT_FOUND", lang), 404);
   }
+
+  const oldStatus = booking.status;
 
   // Validate transition
   const allowed = bookingStatusTransitions[booking.status];
@@ -649,6 +685,11 @@ export async function updateBookingStatusService(bookingId, body, user, lang) {
       booking.loyaltyPointsEarned = pointsEarned;
       await booking.save({ session });
       await session.commitTransaction();
+
+      // Notify guest about status change
+      const roomType = await findRoomTypeById(booking.roomType, { lean: true });
+      notifyGuestStatusChanged(booking, roomType?.name || "Room", oldStatus, newStatus, note);
+
       return booking;
     } catch (err) {
       if (session.inTransaction()) await session.abortTransaction();
@@ -675,6 +716,11 @@ export async function updateBookingStatusService(bookingId, body, user, lang) {
       await decrementBookedRoomsBatch(booking.roomType, noShowDates, session);
       await booking.save({ session });
       await session.commitTransaction();
+
+      // Notify guest about no-show
+      const roomType = await findRoomTypeById(booking.roomType, { lean: true });
+      notifyGuestStatusChanged(booking, roomType?.name || "Room", oldStatus, newStatus, note);
+
       return booking;
     } catch (err) {
       if (session.inTransaction()) await session.abortTransaction();
@@ -685,5 +731,10 @@ export async function updateBookingStatusService(bookingId, body, user, lang) {
   }
 
   await booking.save();
+
+  // Notify guest about status change
+  const roomType = await findRoomTypeById(booking.roomType, { lean: true });
+  notifyGuestStatusChanged(booking, roomType?.name || "Room", oldStatus, newStatus, note);
+
   return booking;
 }

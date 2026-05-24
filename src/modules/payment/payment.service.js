@@ -21,6 +21,11 @@ import {
 } from "../../shared/constants/enums.js";
 import { buildPagination } from "../../shared/utils/apiFeatures.js";
 import { PaymentModel } from "./payment.model.js";
+import {
+  notifyGuestBookingConfirmed,
+  notifyStaffNewBooking,
+} from "../booking/bookingNotifications.js";
+import { findRoomTypeById } from "../room/types/roomType.repository.js";
 
 // ─── Initiate Payment ──────────────────────────────────────
 
@@ -157,6 +162,18 @@ export async function handleWebhookService(reqBody) {
           note: `Payment confirmed via ${gateway.name}`,
         });
         await booking.save({ session });
+
+        // Send emails after commit (fire-and-forget)
+        session.once("ended", async () => {
+          try {
+            const roomType = await findRoomTypeById(booking.roomType, { lean: true });
+            const roomTypeName = roomType?.name || "Room";
+            notifyGuestBookingConfirmed(booking, roomTypeName);
+            notifyStaffNewBooking(booking, roomTypeName);
+          } catch (emailErr) {
+            console.error("[BOOKING_NOTIFY] Post-payment email error:", emailErr.message);
+          }
+        });
       } else if (booking.status === bookingStatus.EXPIRED) {
         // Edge case: booking expired while user was paying
         // Mark payment as paid, then auto-refund via gateway
