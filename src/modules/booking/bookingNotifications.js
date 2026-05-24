@@ -12,6 +12,10 @@ import {
   bookingStatusUpdateEmailHTML,
 } from "../../shared/Email/emailHtml.js";
 import { UserModel } from "../user/user.model.js";
+import {
+  dispatchNotification,
+  dispatchNotificationToUsers,
+} from "../notification/notificationDispatcher.js";
 
 // ─── Helpers ────────────────────────────────────────────────────
 
@@ -126,6 +130,32 @@ export async function notifyGuestBookingConfirmed(booking, roomTypeName) {
       message: html,
     });
   }
+
+  // In-app notification for the booking client (fire-and-forget)
+  if (booking.client) {
+    const clientId =
+      typeof booking.client === "object" && booking.client._id
+        ? booking.client._id
+        : booking.client;
+    dispatchNotification({
+      userId: clientId,
+      title_en: `Booking Confirmed — #${booking.bookingNumber}`,
+      title_ar: `تم تأكيد الحجز — #${booking.bookingNumber}`,
+      body_en: `Your booking for ${roomTypeName} (${fmtDate(booking.checkIn)} → ${fmtDate(booking.checkOut)}) is confirmed.`,
+      body_ar: `تم تأكيد حجزك لـ ${roomTypeName} (${fmtDate(booking.checkIn)} → ${fmtDate(booking.checkOut)}).`,
+      icon: "booking",
+      action: {
+        type: "booking_detail",
+        route: `/bookings/${booking._id}`,
+        params: { bookingId: String(booking._id) },
+      },
+      source: {
+        domain: "booking",
+        event: "confirmed",
+        referenceId: String(booking._id),
+      },
+    }).catch(() => {});
+  }
 }
 
 /**
@@ -156,6 +186,30 @@ export async function notifyStaffNewBooking(booking, roomTypeName, isManual = fa
       message: html,
     });
   }
+
+  // In-app notification to all staff recipients (fire-and-forget)
+  const staffUserIds = staffUsers.map((s) => String(s._id));
+  if (staffUserIds.length > 0) {
+    const guestName = `${booking.guestDetails?.firstName || ""} ${booking.guestDetails?.lastName || ""}`.trim() || "Guest";
+    dispatchNotificationToUsers({
+      userIds: staffUserIds,
+      title_en: isManual ? "New Manual Booking" : "New Booking",
+      title_ar: isManual ? "حجز يدوي جديد" : "حجز جديد",
+      body_en: `${guestName} booked ${roomTypeName} (#${booking.bookingNumber}) for ${fmtDate(booking.checkIn)} → ${fmtDate(booking.checkOut)}.`,
+      body_ar: `قام ${guestName} بحجز ${roomTypeName} (#${booking.bookingNumber}) من ${fmtDate(booking.checkIn)} إلى ${fmtDate(booking.checkOut)}.`,
+      icon: "booking",
+      action: {
+        type: "booking_detail",
+        route: `/bookings/${booking._id}`,
+        params: { bookingId: String(booking._id) },
+      },
+      source: {
+        domain: "booking",
+        event: "new_booking",
+        referenceId: String(booking._id),
+      },
+    }).catch(() => {});
+  }
 }
 
 /**
@@ -182,5 +236,31 @@ export async function notifyGuestStatusChanged(booking, roomTypeName, oldStatus,
       subject: `Booking #${booking.bookingNumber} — Status: ${humanize(newStatus)}`,
       message: html,
     });
+  }
+
+  // In-app notification for the booking client (fire-and-forget)
+  if (booking.client) {
+    const clientId =
+      typeof booking.client === "object" && booking.client._id
+        ? booking.client._id
+        : booking.client;
+    dispatchNotification({
+      userId: clientId,
+      title_en: `Booking #${booking.bookingNumber} — ${humanize(newStatus)}`,
+      title_ar: `حجز #${booking.bookingNumber} — ${humanize(newStatus)}`,
+      body_en: note || `Your booking status changed from ${humanize(oldStatus)} to ${humanize(newStatus)}.`,
+      body_ar: note || `تم تغيير حالة حجزك من ${humanize(oldStatus)} إلى ${humanize(newStatus)}.`,
+      icon: "booking",
+      action: {
+        type: "booking_detail",
+        route: `/bookings/${booking._id}`,
+        params: { bookingId: String(booking._id) },
+      },
+      source: {
+        domain: "booking",
+        event: "status_changed",
+        referenceId: String(booking._id),
+      },
+    }).catch(() => {});
   }
 }

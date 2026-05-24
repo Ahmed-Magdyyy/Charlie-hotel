@@ -6,6 +6,7 @@ import paymentRoutes from "../modules/payment/payment.route.js";
 import loyaltyRoutes from "../modules/loyalty/loyalty.route.js";
 import tierRoutes from "../modules/tier/tier.route.js";
 import analyticsRoutes from "../modules/analytics/analytics.route.js";
+import notificationRoutes from "../modules/notification/notification.route.js";
 
 export function mountRoutes(app) {
   app.use("/api/v1/auth", authRoutes);
@@ -16,4 +17,5 @@ export function mountRoutes(app) {
   app.use("/api/v1/loyalty", loyaltyRoutes);
   app.use("/api/v1/tiers", tierRoutes);
   app.use("/api/v1/analytics", analyticsRoutes);
+  app.use("/api/v1/notifications", notificationRoutes);
 }

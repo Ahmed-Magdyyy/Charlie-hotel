@@ -24,6 +24,7 @@ export const permissionResources = Object.freeze({
   USERS: "users",
   ROOMS: "rooms",
   RESERVATIONS: "reservations",
+  NOTIFICATIONS: "notifications",
 });
 
 // ─── Bed Types ─────────────────────────────────────────────
@@ -274,3 +275,13 @@ export const supportedCurrencies = Object.freeze([
 
 export const MUN_TAX_RATE = 0.025; // 2.5% Municipal tax
 export const VAT_RATE = 0.15; // 15% VAT (applied after mun tax)
+
+// ─── Notification Icons ────────────────────────────────────
+
+export const notificationIcons = Object.freeze({
+  BOOKING: "booking",
+  PAYMENT: "payment",
+  LOYALTY: "loyalty",
+  SYSTEM: "system",
+  PROMO: "promo",
+});

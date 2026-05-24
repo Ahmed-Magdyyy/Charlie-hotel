@@ -20,6 +20,7 @@ import { mountRoutes } from "./routes.js";
 import { i18nMiddleware } from "../shared/middlewares/i18nMiddleware.js";
 import { startBookingExpiryJob } from "../shared/jobs/bookingExpiryJob.js";
 import { startPaymentReconciliationJob } from "../shared/jobs/paymentReconciliationJob.js";
+import { startNotificationCleanupJob } from "../shared/jobs/notificationCleanupJob.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -60,6 +61,7 @@ mountRoutes(app);
 // Start background jobs
 startBookingExpiryJob();
 startPaymentReconciliationJob();
+startNotificationCleanupJob();
 
 app.get("/", (req, res) => {
   res.send("Charlie Hotel API is running.");

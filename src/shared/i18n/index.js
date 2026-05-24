@@ -9,8 +9,9 @@ import loyalty from "./modules/loyalty.js";
 import tier from "./modules/tier.js";
 import analytics from "./modules/analytics.js";
 import enumLabels from "./modules/enumLabels.js";
+import notification from "./modules/notification.js";
 
-const messages = { common, auth, user, room, booking, payment, loyalty, tier, analytics };
+const messages = { common, auth, user, room, booking, payment, loyalty, tier, analytics, notification };
 
 /**
  * Translate a message key to the given language.
