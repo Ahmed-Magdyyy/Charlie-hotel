@@ -199,8 +199,20 @@ export const authService = {
     return { message: t("auth.OTP_RESENT", lang) };
   },
 
-  login: async ({ email, password }, lang) => {
-    const user = await UserModel.findOne({ email }).select("+passwordHash");
+  login: async ({ identifier, password }, lang) => {
+    // Determine lookup field: email (contains @) or membershipNumber (exactly 10 digits)
+    let query;
+    const trimmed = identifier.trim();
+
+    if (trimmed.includes("@")) {
+      query = { email: trimmed.toLowerCase() };
+    } else if (/^\d{10}$/.test(trimmed)) {
+      query = { membershipNumber: trimmed };
+    } else {
+      throw new ApiError(t("auth.INVALID_CREDENTIALS", lang), 401);
+    }
+
+    const user = await UserModel.findOne(query).select("+passwordHash");
 
     if (!user || !(await bcrypt.compare(password, user.passwordHash))) {
       throw new ApiError(t("auth.INVALID_CREDENTIALS", lang), 401);

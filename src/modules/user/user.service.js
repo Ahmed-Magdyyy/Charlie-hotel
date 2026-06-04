@@ -17,6 +17,7 @@ const mapUserToResponse = (user) => {
     lastName: user.lastName,
     email: user.email,
     phone: user.phone,
+    membershipNumber: user.membershipNumber,
     role: user.role,
     position: user.role === roles.STAFF ? user.position : undefined,
     permissions: user.role === roles.STAFF ? user.permissions : undefined,
@@ -37,8 +38,13 @@ export async function getUsersService(queryParams, requesterUser) {
   const { page, limit, ...query } = queryParams;
 
   const filter = {
-    ...buildRegexFilter(query, ["role"]),
+    ...buildRegexFilter(query, ["role", "membershipNumber"]),
   };
+
+  // Membership number is an exact match, not a regex
+  if (query.membershipNumber) {
+    filter.membershipNumber = query.membershipNumber;
+  }
 
   // Only restrict from seeing admins if the requester is NOT an admin
   if (requesterUser?.role !== roles.ADMIN) {

@@ -80,11 +80,12 @@ export const verifyEmailValidator = [
 ];
 
 export const loginValidator = [
-  body("email")
+  body("identifier")
+    .trim()
     .notEmpty()
-    .withMessage("Email is required")
-    .isEmail()
-    .withMessage("Invalid email address"),
+    .withMessage("Email or membership number is required")
+    .isString()
+    .withMessage("Identifier must be a string"),
 
   body("password")
     .notEmpty()

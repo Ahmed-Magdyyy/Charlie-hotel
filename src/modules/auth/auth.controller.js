@@ -9,6 +9,7 @@ function buildAuthUserResponse(user) {
     lastName: user.lastName,
     email: user.email,
     phone: user.phone,
+    membershipNumber: user.membershipNumber,
     accountStatus: user.account_status,
     role: user.role,
     position: user.role === roles.STAFF ? user.position : undefined,

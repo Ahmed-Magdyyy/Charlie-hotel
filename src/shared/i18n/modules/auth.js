@@ -32,8 +32,8 @@ export default {
 
   // ── Login ──
   INVALID_CREDENTIALS: {
-    en: "Invalid email or password.",
-    ar: "بريد إلكتروني أو كلمة مرور غير صحيحة.",
+    en: "Invalid credentials.",
+    ar: "بيانات الدخول غير صحيحة.",
   },
   VERIFY_EMAIL_BEFORE_LOGIN: {
     en: "Please verify your email before logging in.",

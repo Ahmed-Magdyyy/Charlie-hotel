@@ -1,6 +1,17 @@
 import mongoose from "mongoose";
 import bcrypt from "bcrypt";
+import crypto from "crypto";
 import { accountStatus, roles } from "../../shared/constants/enums.js";
+
+/**
+ * Generate a random 10-digit numeric string.
+ * Uses crypto.randomInt for uniform distribution.
+ */
+function generateMembershipNumber() {
+  // Range: 1000000000 – 9999999999 (always exactly 10 digits)
+  const num = crypto.randomInt(1_000_000_000, 10_000_000_000);
+  return String(num);
+}
 
 const userSchema = new mongoose.Schema(
   {
@@ -17,6 +28,12 @@ const userSchema = new mongoose.Schema(
       unique: true,
       required: [true, "Phone is required"],
       sparse: true,
+      trim: true,
+    },
+    membershipNumber: {
+      type: String,
+      unique: true,
+      index: true,
       trim: true,
     },
     passwordHash: {
@@ -110,6 +127,19 @@ const userSchema = new mongoose.Schema(
   },
   { timestamps: true },
 );
+
+userSchema.pre("validate", async function () {
+  if (!this.isNew || this.membershipNumber) return;
+
+  // Generate a unique 10-digit membership number with collision retry
+  let candidate;
+  let exists = true;
+  while (exists) {
+    candidate = generateMembershipNumber();
+    exists = await mongoose.model("User").exists({ membershipNumber: candidate });
+  }
+  this.membershipNumber = candidate;
+});
 
 userSchema.pre("save", async function () {
   if (!this.isModified("passwordHash")) return;
