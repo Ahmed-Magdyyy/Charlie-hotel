@@ -208,8 +208,10 @@ export async function calculatePriceBreakdown(
     tierDiscountRate,
     tierDiscount,
     taxableAmount: Math.round(taxableAmount),
-    munTaxRate: effectiveMunTaxRate,
-    munTax: Math.round(munTax),
+    ...(isRoomOnly && {
+      munTaxRate: effectiveMunTaxRate,
+      munTax: Math.round(munTax),
+    }),
     vatRate: VAT_RATE,
     vatAmount: Math.round(vatAmount),
     taxes: Math.round(taxes),
