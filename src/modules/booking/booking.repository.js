@@ -1,7 +1,7 @@
 import { BookingModel } from "./booking.model.js";
 
 /**
- * Generate a human-readable booking number: CH-YYYYMMDD-NNN
+ * Generate a human-readable booking number: CH-JED-YYYYMMDD-NNN
  */
 export async function generateBookingNumber() {
   const today = new Date();
@@ -10,7 +10,7 @@ export async function generateBookingNumber() {
     String(today.getUTCMonth() + 1).padStart(2, "0") +
     String(today.getUTCDate()).padStart(2, "0");
 
-  const prefix = `CH-${dateStr}-`;
+  const prefix = `CH-JED-${dateStr}-`;
 
   // Count today's bookings to get next sequence
   const startOfDay = new Date(dateStr.slice(0, 4) + "-" + dateStr.slice(4, 6) + "-" + dateStr.slice(6, 8) + "T00:00:00.000Z");

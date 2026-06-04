@@ -492,7 +492,12 @@ export async function getAllBookingsService(queryParams, lang) {
     filter.checkIn = { $lte: dateFilter.createdAt.$lte };
     filter.checkOut = { $gte: dateFilter.createdAt.$gte };
   }
-  if (status) filter.status = status;
+  if (status) {
+    filter.status = status;
+  } else {
+    // Exclude expired bookings by default — only show when explicitly queried
+    filter.status = { $ne: "expired" };
+  }
   if (paymentStatus) filter.paymentStatus = paymentStatus;
   if (roomTypeId) filter.roomType = roomTypeId;
 

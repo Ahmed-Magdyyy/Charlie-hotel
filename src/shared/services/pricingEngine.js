@@ -3,7 +3,7 @@ import { findPricingByRoomTypeAndDateRange } from "../../modules/room/pricing/ro
 import { getLoyaltyConfig } from "../../modules/loyalty/loyalty.repository.js";
 import { ApiError } from "../utils/ApiError.js";
 import { t, translateEnum } from "../i18n/index.js";
-import { MUN_TAX_RATE, VAT_RATE } from "../constants/enums.js";
+import { MUN_TAX_RATE, VAT_RATE, reservationOptionTypes } from "../constants/enums.js";
 
 /**
  * Calculate full price breakdown for a booking.
@@ -164,9 +164,13 @@ export async function calculatePriceBreakdown(
   const amountAfterLoyalty = Math.max(0, subtotal - loyaltyDiscount);
   const tierDiscount = Math.round(amountAfterLoyalty * tierDiscountRate);
 
-  // 9. Tax — Saudi order: mun tax 2.5% first, then VAT 15% on (amount + mun tax)
+  // 9. Tax — Saudi rules:
+  //    Municipal tax 2.5% applies ONLY to room_only bookings.
+  //    VAT 15% always applies on (taxableAmount + munTax).
   const taxableAmount = amountAfterLoyalty - tierDiscount;
-  const munTax = Math.round(taxableAmount * MUN_TAX_RATE * 100) / 100;
+  const isRoomOnly = reservationOption === reservationOptionTypes.ROOM_ONLY;
+  const effectiveMunTaxRate = isRoomOnly ? MUN_TAX_RATE : 0;
+  const munTax = Math.round(taxableAmount * effectiveMunTaxRate * 100) / 100;
   const vatAmount = Math.round((taxableAmount + munTax) * VAT_RATE * 100) / 100;
   const taxes = Math.round((munTax + vatAmount) * 100) / 100;
 
@@ -204,7 +208,7 @@ export async function calculatePriceBreakdown(
     tierDiscountRate,
     tierDiscount,
     taxableAmount: Math.round(taxableAmount),
-    munTaxRate: MUN_TAX_RATE,
+    munTaxRate: effectiveMunTaxRate,
     munTax: Math.round(munTax),
     vatRate: VAT_RATE,
     vatAmount: Math.round(vatAmount),

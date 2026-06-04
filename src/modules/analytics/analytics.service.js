@@ -336,7 +336,7 @@ async function getTodaySummary(today) {
   const tomorrowStart = new Date(todayStart);
   tomorrowStart.setUTCDate(tomorrowStart.getUTCDate() + 1);
 
-  const [todayCheckouts, todayCheckins, pendingPayments, newReservations] =
+  const [todayCheckouts, todayCheckins, pendingPayments, newReservations, cancelled, noShow] =
     await Promise.all([
       // Today's Checkouts: bookings checking out today
       BookingModel.countDocuments({
@@ -361,6 +361,18 @@ async function getTodaySummary(today) {
         createdAt: { $gte: todayStart, $lt: tomorrowStart },
         status: { $nin: ["expired"] },
       }),
+
+      // Cancelled: bookings cancelled today
+      BookingModel.countDocuments({
+        updatedAt: { $gte: todayStart, $lt: tomorrowStart },
+        status: "cancelled",
+      }),
+
+      // No Show: bookings marked as no_show today
+      BookingModel.countDocuments({
+        updatedAt: { $gte: todayStart, $lt: tomorrowStart },
+        status: "no_show",
+      }),
     ]);
 
   return {
@@ -368,6 +380,8 @@ async function getTodaySummary(today) {
     todayCheckins,
     pendingPayments,
     newReservations,
+    cancelled,
+    noShow,
   };
 }
 
