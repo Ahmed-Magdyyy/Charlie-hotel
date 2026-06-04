@@ -25,6 +25,12 @@ const mapUserToResponse = (user) => {
     loyaltyPoints: user.loyaltyPoints,
     isActive: user.isActive,
     account_status: user.account_status,
+    addresses: (user.addresses || []).map((a) => ({
+      id: a._id,
+      country: a.country,
+      city: a.city,
+      address: a.address,
+    })),
     createdAt: user.createdAt,
     updatedAt: user.updatedAt,
   };
@@ -135,6 +141,7 @@ export async function updateUserService(id, payload, lang) {
     permissions,
     preferredLanguage,
     loyaltyPoints,
+    addresses,
   } = payload;
 
   if (firstName !== undefined) user.firstName = firstName;
@@ -157,6 +164,8 @@ export async function updateUserService(id, payload, lang) {
     if (position !== undefined) user.position = position;
     if (permissions !== undefined) user.permissions = permissions;
   }
+
+  if (addresses !== undefined) user.addresses = addresses;
 
   await user.save();
   return mapUserToResponse(user);
@@ -244,6 +253,7 @@ export async function updateLoggedUserDataService({
   email,
   phone,
   preferredLanguage,
+  addresses,
   lang,
 }) {
   const user = await UserModel.findById(userId);
@@ -265,6 +275,7 @@ export async function updateLoggedUserDataService({
   if (phone !== undefined) {
     user.phone = phone;
   }
+  if (addresses !== undefined) user.addresses = addresses;
 
   await user.save();
   return mapUserToResponse(user);

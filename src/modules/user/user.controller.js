@@ -85,7 +85,8 @@ export const updateLoggedUserPassword = asyncHandler(async (req, res) => {
 
 // PATCH /api/v1/users/me
 export const updateLoggedUserData = asyncHandler(async (req, res) => {
-  const { firstName, lastName, email, phone, preferredLanguage } = req.body;
+  const { firstName, lastName, email, phone, preferredLanguage, addresses } =
+    req.body;
 
   const updatedUser = await updateLoggedUserDataService({
     userId: req.user._id,
@@ -94,6 +95,7 @@ export const updateLoggedUserData = asyncHandler(async (req, res) => {
     email,
     phone,
     preferredLanguage,
+    addresses,
     lang: req.lang,
   });
 

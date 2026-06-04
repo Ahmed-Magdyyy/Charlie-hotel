@@ -45,6 +45,26 @@ export const createUserValidator = [
     .isObject()
     .withMessage("Permissions must be an object"),
 
+  body("addresses")
+    .optional()
+    .isArray()
+    .withMessage("Addresses must be an array"),
+
+  body("addresses.*.country")
+    .trim()
+    .notEmpty()
+    .withMessage("Country is required for each address"),
+
+  body("addresses.*.city")
+    .trim()
+    .notEmpty()
+    .withMessage("City is required for each address"),
+
+  body("addresses.*.address")
+    .trim()
+    .notEmpty()
+    .withMessage("Address text is required for each address"),
+
   validatorMiddleware,
 ];
 
@@ -81,6 +101,26 @@ export const updateUserValidator = [
     .optional()
     .isObject()
     .withMessage("Permissions must be an object"),
+
+  body("addresses")
+    .optional()
+    .isArray()
+    .withMessage("Addresses must be an array"),
+
+  body("addresses.*.country")
+    .trim()
+    .notEmpty()
+    .withMessage("Country is required for each address"),
+
+  body("addresses.*.city")
+    .trim()
+    .notEmpty()
+    .withMessage("City is required for each address"),
+
+  body("addresses.*.address")
+    .trim()
+    .notEmpty()
+    .withMessage("Address text is required for each address"),
 
   validatorMiddleware,
 ];
@@ -121,6 +161,26 @@ export const updateLoggedUserDataValidator = [
     .optional()
     .isIn(["en", "ar"])
     .withMessage("Language must be en or ar"),
+
+  body("addresses")
+    .optional()
+    .isArray()
+    .withMessage("Addresses must be an array"),
+
+  body("addresses.*.country")
+    .trim()
+    .notEmpty()
+    .withMessage("Country is required for each address"),
+
+  body("addresses.*.city")
+    .trim()
+    .notEmpty()
+    .withMessage("City is required for each address"),
+
+  body("addresses.*.address")
+    .trim()
+    .notEmpty()
+    .withMessage("Address text is required for each address"),
 
   validatorMiddleware,
 ];

@@ -124,6 +124,26 @@ const userSchema = new mongoose.Schema(
         expiresAt: Date,
       },
     ],
+
+    addresses: [
+      {
+        country: {
+          type: String,
+          required: [true, "Country is required"],
+          trim: true,
+        },
+        city: {
+          type: String,
+          required: [true, "City is required"],
+          trim: true,
+        },
+        address: {
+          type: String,
+          required: [true, "Address is required"],
+          trim: true,
+        },
+      },
+    ],
   },
   { timestamps: true },
 );
