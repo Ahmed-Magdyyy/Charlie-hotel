@@ -87,6 +87,10 @@ const userSchema = new mongoose.Schema(
       type: Boolean,
       default: true,
     },
+    isDeleted: {
+      type: Boolean,
+      default: false,
+    },
     preferredLanguage: {
       type: String,
       enum: ["en", "ar"],
@@ -151,7 +155,7 @@ userSchema.index(
   { email: 1 },
   {
     unique: true,
-    partialFilterExpression: { account_status: { $ne: "deleted" } },
+    partialFilterExpression: { isDeleted: { $eq: false } },
   },
 );
 
@@ -159,7 +163,7 @@ userSchema.index(
   { phone: 1 },
   {
     unique: true,
-    partialFilterExpression: { account_status: { $ne: "deleted" } },
+    partialFilterExpression: { isDeleted: { $eq: false } },
   },
 );
 

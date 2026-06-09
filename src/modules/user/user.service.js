@@ -184,6 +184,7 @@ export async function deleteUserService(id, lang) {
   }
 
   user.isActive = false;
+  user.isDeleted = true;
   user.account_status = accountStatus.DELETED;
   user.refreshTokens = [];
 
@@ -286,6 +287,7 @@ export async function deleteLoggedUserService({ userId, lang }) {
   }
 
   user.isActive = false;
+  user.isDeleted = true;
   user.account_status = accountStatus.DELETED;
   user.refreshTokens = [];
 
