@@ -102,9 +102,10 @@ export async function getUserByIdService(id, lang) {
 export async function createUserService(payload, lang) {
   const { email, phone, password, role, ...rest } = payload;
 
-  // Check if user already exists
+  // Check if a non-deleted user already exists with this email or phone
   const existingUser = await UserModel.findOne({
     $or: [{ email }, { phone }],
+    account_status: { $ne: accountStatus.DELETED },
   });
 
   if (existingUser) {

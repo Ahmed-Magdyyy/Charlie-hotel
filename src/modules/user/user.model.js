@@ -17,17 +17,13 @@ const userSchema = new mongoose.Schema(
   {
     email: {
       type: String,
-      unique: true,
       required: [true, "Email is required"],
-      index: true,
       lowercase: true,
       trim: true,
     },
     phone: {
       type: String,
-      unique: true,
       required: [true, "Phone is required"],
-      sparse: true,
       trim: true,
     },
     membershipNumber: {
@@ -146,6 +142,25 @@ const userSchema = new mongoose.Schema(
     ],
   },
   { timestamps: true },
+);
+
+// ─── Partial Unique Indexes ─────────────────────────────────
+// Only enforce uniqueness among non-deleted accounts so that
+// soft-deleted users' emails/phones can be reused for new accounts.
+userSchema.index(
+  { email: 1 },
+  {
+    unique: true,
+    partialFilterExpression: { account_status: { $ne: "deleted" } },
+  },
+);
+
+userSchema.index(
+  { phone: 1 },
+  {
+    unique: true,
+    partialFilterExpression: { account_status: { $ne: "deleted" } },
+  },
 );
 
 userSchema.pre("validate", async function () {

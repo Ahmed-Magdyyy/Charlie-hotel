@@ -86,7 +86,10 @@ const checkOtpRateLimit = (user, lang) => {
 
 export const authService = {
   signup: async (userData, lang) => {
-    let user = await UserModel.findOne({ email: userData.email });
+    let user = await UserModel.findOne({
+      email: userData.email,
+      account_status: { $ne: accountStatus.DELETED },
+    });
 
     if (user && user.emailVerified) {
       throw new ApiError(t("auth.EMAIL_ALREADY_EXISTS", lang), 400);
@@ -142,6 +145,7 @@ export const authService = {
 
     const user = await UserModel.findOne({
       email,
+      account_status: { $ne: accountStatus.DELETED },
     });
 
     if (!user) {
@@ -167,7 +171,10 @@ export const authService = {
   },
 
   resendOtp: async ({ email }, lang) => {
-    const user = await UserModel.findOne({ email });
+    const user = await UserModel.findOne({
+      email,
+      account_status: { $ne: accountStatus.DELETED },
+    });
 
     if (!user) {
       throw new ApiError(t("auth.USER_NOT_FOUND", lang), 404);
@@ -212,14 +219,14 @@ export const authService = {
       throw new ApiError(t("auth.INVALID_CREDENTIALS", lang), 401);
     }
 
+    // Exclude deleted accounts so we don't match a soft-deleted user
+    // when an active user with the same email exists
+    query.account_status = { $ne: accountStatus.DELETED };
+
     const user = await UserModel.findOne(query).select("+passwordHash");
 
     if (!user || !(await bcrypt.compare(password, user.passwordHash))) {
       throw new ApiError(t("auth.INVALID_CREDENTIALS", lang), 401);
-    }
-
-    if (user.account_status === accountStatus.DELETED) {
-      throw new ApiError(t("auth.ACCOUNT_DELETED", lang), 403);
     }
 
     if (!user.emailVerified) {
@@ -245,7 +252,10 @@ export const authService = {
   },
 
   forgetPassword: async ({ email }, lang) => {
-    const user = await UserModel.findOne({ email });
+    const user = await UserModel.findOne({
+      email,
+      account_status: { $ne: accountStatus.DELETED },
+    });
     if (!user) {
       throw new ApiError(t("auth.USER_NOT_FOUND", lang), 404);
     }
@@ -286,7 +296,10 @@ export const authService = {
   },
 
   resetPassword: async ({ email, newPassword }, lang) => {
-    const user = await UserModel.findOne({ email }).select("+passwordHash");
+    const user = await UserModel.findOne({
+      email,
+      account_status: { $ne: accountStatus.DELETED },
+    }).select("+passwordHash");
 
     if (!user) {
       throw new ApiError(t("auth.USER_NOT_FOUND", lang), 404);
