@@ -20,7 +20,7 @@ router.use(protect);
 router.get("/me", getMyTier);
 
 // ─── Admin ─────────────────────────────────────────────────
-router.get("/config", allowedTo("admin"), getConfig);
+router.get("/config", getConfig);
 router.patch(
   "/config",
   allowedTo("admin"),
