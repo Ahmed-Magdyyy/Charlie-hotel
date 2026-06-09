@@ -182,12 +182,8 @@ export async function deleteUserService(id, lang) {
   }
 
   user.isActive = false;
-  user.account_status = "suspended";
+  user.account_status = accountStatus.DELETED;
   user.refreshTokens = [];
-
-  // We don't truly delete strings to preserve booking history, but we could pseudonymize them
-  user.firstName = `Deleted`;
-  user.lastName = `User`;
 
   await user.save();
   return user;
