@@ -45,6 +45,7 @@ export async function getUsersService(queryParams, requesterUser) {
 
   const filter = {
     ...buildRegexFilter(query, ["role", "membershipNumber"]),
+    account_status: { $ne: accountStatus.DELETED },
   };
 
   // Membership number is an exact match, not a regex
