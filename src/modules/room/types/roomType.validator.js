@@ -1,5 +1,60 @@
 import { body, param } from "express-validator";
 import { validatorMiddleware } from "../../../shared/middlewares/validatorMiddleware.js";
+import { t } from "../../../shared/i18n/index.js";
+
+/**
+ * Parse a JSON-string value into an array.
+ * Returns the parsed array or false if invalid.
+ */
+function parseJsonArray(value) {
+  if (Array.isArray(value)) return value;
+  if (typeof value === "string") {
+    try {
+      const parsed = JSON.parse(value);
+      if (!Array.isArray(parsed)) return false;
+      return parsed;
+    } catch {
+      return false;
+    }
+  }
+  return false;
+}
+
+/**
+ * Custom validator: value must be a valid JSON array with ≥ 1 item.
+ */
+function isNonEmptyJsonArray(value) {
+  const arr = parseJsonArray(value);
+  return arr !== false && arr.length >= 1;
+}
+
+/**
+ * Required JSON-array field (create): must be present and have ≥ 1 item.
+ */
+function requiredJsonArray(field, i18nPrefix) {
+  return body(field)
+    .notEmpty()
+    .withMessage((value, { req }) =>
+      t(`room.${i18nPrefix}_REQUIRED`, req.lang),
+    )
+    .custom(isNonEmptyJsonArray)
+    .withMessage((value, { req }) =>
+      t(`room.${i18nPrefix}_REQUIRED`, req.lang),
+    );
+}
+
+/**
+ * Optional JSON-array field (update): skipped if not sent,
+ * but if provided must have ≥ 1 item.
+ */
+function optionalJsonArray(field, i18nPrefix) {
+  return body(field)
+    .optional()
+    .custom(isNonEmptyJsonArray)
+    .withMessage((value, { req }) =>
+      t(`room.${i18nPrefix}_REQUIRED`, req.lang),
+    );
+}
 
 export const createRoomTypeValidator = [
   body("name_en")
@@ -31,9 +86,11 @@ export const createRoomTypeValidator = [
     .isFloat({ min: 0 })
     .withMessage("Base price must be 0 or more"),
 
-  // beds, amenities, views, smokingPolicy, accessibilityFeatures,
-  // reservationOptions, cancellationPolicies, paymentOptions
-  // are sent as JSON strings — validated and parsed in the service layer
+  // ─── Required array fields (sent as JSON strings) ─────────
+
+  requiredJsonArray("reservationOptions", "RESERVATION_OPTIONS"),
+  requiredJsonArray("cancellationPolicies", "CANCELLATION_POLICIES"),
+  requiredJsonArray("paymentOptions", "PAYMENT_OPTIONS"),
 
   body("totalRoomCount")
     .optional()
@@ -70,6 +127,12 @@ export const updateRoomTypeValidator = [
     .optional()
     .isFloat({ min: 0 })
     .withMessage("Base price must be 0 or more"),
+
+  // ─── Optional on update, but if provided must have ≥ 1 item ──
+
+  optionalJsonArray("reservationOptions", "RESERVATION_OPTIONS"),
+  optionalJsonArray("cancellationPolicies", "CANCELLATION_POLICIES"),
+  optionalJsonArray("paymentOptions", "PAYMENT_OPTIONS"),
 
   body("totalRoomCount")
     .optional()

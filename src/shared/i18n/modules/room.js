@@ -36,6 +36,20 @@ export default {
     ar: "لا يمكن حظر أكثر من {{max}} غرفة في {{date}} — لا تتوفر غرف كافية",
   },
 
+  // ─── Validation: Required Arrays ──────────────────────────
+  RESERVATION_OPTIONS_REQUIRED: {
+    en: "At least one reservation option is required",
+    ar: "يجب تحديد خيار حجز واحد على الأقل",
+  },
+  CANCELLATION_POLICIES_REQUIRED: {
+    en: "At least one cancellation policy is required",
+    ar: "يجب تحديد سياسة إلغاء واحدة على الأقل",
+  },
+  PAYMENT_OPTIONS_REQUIRED: {
+    en: "At least one payment option is required",
+    ar: "يجب تحديد طريقة دفع واحدة على الأقل",
+  },
+
   // ─── Bed Types ────────────────────────────────────────────
   BED_TYPE_king: { en: "King Bed", ar: "سرير كينج" },
   BED_TYPE_queen: { en: "Queen Bed", ar: "سرير كوين" },

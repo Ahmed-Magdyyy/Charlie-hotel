@@ -221,7 +221,10 @@ export async function createRoomTypeService(payload, files, lang) {
   const parsedBeds = parseJsonField(beds, "beds");
   const parsedAmenities = parseJsonField(amenities, "amenities");
   const parsedViews = parseJsonField(views, "views");
-  const parsedAccessibility = parseJsonField(accessibilityFeatures, "accessibilityFeatures");
+  const parsedAccessibility = parseJsonField(
+    accessibilityFeatures,
+    "accessibilityFeatures",
+  );
   const parsedReservationOptions = parseJsonField(
     reservationOptions,
     "reservationOptions",
@@ -300,7 +303,11 @@ export async function getRoomTypesService(queryParams, lang) {
     page: pageNum,
     results: roomTypes.length,
     roomTypes: roomTypes.map((rt) =>
-      raw === "true" ? (rt.toObject ? rt.toObject() : rt) : resolveRoomTypeLabels(rt, lang),
+      raw === "true"
+        ? rt.toObject
+          ? rt.toObject()
+          : rt
+        : resolveRoomTypeLabels(rt, lang),
     ),
   };
 }
@@ -374,8 +381,12 @@ export async function updateRoomTypeService(id, payload, files, lang) {
   const parsedViews = parseJsonField(views, "views");
   if (parsedViews !== undefined) roomType.views = parsedViews;
 
-  const parsedAccessibility = parseJsonField(accessibilityFeatures, "accessibilityFeatures");
-  if (parsedAccessibility !== undefined) roomType.accessibilityFeatures = parsedAccessibility;
+  const parsedAccessibility = parseJsonField(
+    accessibilityFeatures,
+    "accessibilityFeatures",
+  );
+  if (parsedAccessibility !== undefined)
+    roomType.accessibilityFeatures = parsedAccessibility;
 
   const parsedReservationOptions = parseJsonField(
     reservationOptions,
